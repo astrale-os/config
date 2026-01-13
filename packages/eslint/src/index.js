@@ -4,6 +4,7 @@ import eslintConfigPrettier from 'eslint-config-prettier'
 
 /**
  * @typedef {Object} ConfigOptions
+ * @property {string} [tsconfigRootDir] - Root directory for TypeScript config (required for type-aware linting)
  * @property {string[]} [testPatterns] - Glob patterns for test files (default: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.perf.ts'])
  * @property {string[]} [ignorePatterns] - Additional patterns to ignore
  */
@@ -16,22 +17,31 @@ import eslintConfigPrettier from 'eslint-config-prettier'
  */
 export function createConfig(options = {}) {
   const {
+    tsconfigRootDir,
     testPatterns = ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.perf.ts'],
     ignorePatterns = [],
   } = options
 
-  return tseslint.config(
+  const baseConfig = [
     eslint.configs.recommended,
     ...tseslint.configs.recommended,
     eslintConfigPrettier,
-    {
+  ]
+
+  // Only add type-aware config if tsconfigRootDir is provided
+  if (tsconfigRootDir) {
+    baseConfig.push({
       languageOptions: {
         parserOptions: {
           projectService: true,
-          tsconfigRootDir: import.meta.dirname,
+          tsconfigRootDir,
         },
       },
-    },
+    })
+  }
+
+  return tseslint.config(
+    ...baseConfig,
     {
       rules: {
         // TypeScript rules - pragmatic defaults
