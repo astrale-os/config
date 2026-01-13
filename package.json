@@ -1,5 +1,5 @@
 {
-  "name": "@astrale-os/config-workspace",
+  "name": "@astrale-os/workspace-config",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -32,7 +32,7 @@
   "prettier": {
     "semi": false,
     "singleQuote": true,
-    "trailingComma": "es5",
+    "trailingComma": "all",
     "printWidth": 100,
     "tabWidth": 2,
     "useTabs": false,
