@@ -4,7 +4,9 @@
   "description": "Shared Renovate configuration for Astrale OS projects",
   "renovate-config": {
     "default": {
-      "extends": ["local>astrale-os/config:packages/renovate/default"]
+      "extends": [
+        "local>astrale-os/config:packages/renovate/default"
+      ]
     }
   },
   "keywords": [

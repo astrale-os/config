@@ -87,7 +87,7 @@ export function createConfig(options = {}) {
         '**/vitest.config.ts',
         ...ignorePatterns,
       ],
-    }
+    },
   )
 }
 
