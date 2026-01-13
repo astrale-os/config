@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: ./.github/workflows/ci/default.yml
+    uses: ./.github/workflows/ci-default.yml
     with:
       run-test: false
       run-typecheck: false
