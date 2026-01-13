@@ -5,6 +5,9 @@ inputs:
   node-version-file:
     description: Path to .nvmrc or similar file
     default: '.nvmrc'
+  build-first:
+    description: Build packages before running checks (required for monorepos with inter-package dependencies)
+    default: 'true'
   run-lint:
     description: Run ESLint and Prettier checks
     default: 'true'
@@ -15,8 +18,8 @@ inputs:
     description: Run tests
     default: 'true'
   run-build:
-    description: Run build
-    default: 'true'
+    description: Run build (ignored if build-first is true)
+    default: 'false'
   lint-command:
     description: Command to run for linting
     default: 'pnpm lint'
@@ -49,6 +52,11 @@ runs:
       shell: bash
       run: pnpm install --frozen-lockfile
 
+    - name: Build packages (before checks)
+      if: inputs.build-first == 'true'
+      shell: bash
+      run: ${{ inputs.build-command }}
+
     - name: Run ESLint
       if: inputs.run-lint == 'true'
       shell: bash
@@ -69,7 +77,7 @@ runs:
       shell: bash
       run: ${{ inputs.test-command }}
 
-    - name: Build packages
-      if: inputs.run-build == 'true'
+    - name: Build packages (after checks)
+      if: inputs.run-build == 'true' && inputs.build-first == 'false'
       shell: bash
       run: ${{ inputs.build-command }}
