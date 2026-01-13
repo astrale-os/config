@@ -18,6 +18,7 @@ jobs:
     name: Publish to JSR
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         package:
           - eslint
@@ -35,4 +36,4 @@ jobs:
 
       - name: Publish ${{ matrix.package }} to JSR
         working-directory: packages/${{ matrix.package }}
-        run: npx jsr publish --allow-dirty
+        run: npx jsr publish --allow-slow-types --allow-dirty

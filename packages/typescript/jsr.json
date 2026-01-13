@@ -1,6 +1,7 @@
 {
   "name": "@astrale-os/typescript-config",
   "version": "1.0.0",
+  "license": "MIT",
   "exports": {
     "./base": "./base.json",
     "./library": "./library.json",
