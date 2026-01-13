@@ -1,0 +1,9 @@
+{
+  "name": "@astrale-os/typescript-config",
+  "version": "1.0.0",
+  "exports": {
+    "./base": "./base.json",
+    "./library": "./library.json",
+    "./app": "./app.json"
+  }
+}

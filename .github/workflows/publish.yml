@@ -1,45 +1,38 @@
-name: Publish
+name: Publish to JSR
 
 on:
   push:
     branches: [main]
     paths:
-      - '.release-please-manifest.json'
+      - 'packages/*/jsr.json'
+      - 'packages/*/src/**'
+      - 'packages/typescript/*.json'
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
+  id-token: write
 
 jobs:
   publish:
-    name: Publish to GitHub Packages
+    name: Publish to JSR
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          - eslint
+          - typescript
+          - prettier
+          - commitlint
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
-      - name: Configure npm for GitHub Packages
-        run: |
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> ~/.npmrc
-          echo "@astrale-os:registry=https://npm.pkg.github.com" >> ~/.npmrc
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build packages
-        run: pnpm build
-
-      - name: Publish packages
-        run: pnpm -r publish --access restricted --no-git-checks 2>&1 | grep -v "already published" || true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish ${{ matrix.package }} to JSR
+        working-directory: packages/${{ matrix.package }}
+        run: npx jsr publish --allow-dirty

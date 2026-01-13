@@ -22,9 +22,6 @@
     "url": "git+https://github.com/astrale-os/config.git",
     "directory": "packages/prettier"
   },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "peerDependencies": {
     "prettier": "^3.0.0"
   }

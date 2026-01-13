@@ -18,8 +18,5 @@
     "type": "git",
     "url": "git+https://github.com/astrale-os/config.git",
     "directory": "packages/renovate"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
   }
 }

@@ -27,9 +27,6 @@
     "url": "git+https://github.com/astrale-os/config.git",
     "directory": "packages/eslint"
   },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "peerDependencies": {
     "@eslint/js": "^9.0.0",
     "eslint": "^9.0.0",

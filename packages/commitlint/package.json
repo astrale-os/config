@@ -23,9 +23,6 @@
     "url": "git+https://github.com/astrale-os/config.git",
     "directory": "packages/commitlint"
   },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "dependencies": {
     "@commitlint/config-conventional": "^20.3.1"
   },
