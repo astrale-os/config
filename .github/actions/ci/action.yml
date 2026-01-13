@@ -1,0 +1,75 @@
+name: CI
+description: Run lint, typecheck, test, and build
+
+inputs:
+  node-version-file:
+    description: Path to .nvmrc or similar file
+    default: '.nvmrc'
+  run-lint:
+    description: Run ESLint and Prettier checks
+    default: 'true'
+  run-typecheck:
+    description: Run TypeScript type checking
+    default: 'true'
+  run-test:
+    description: Run tests
+    default: 'true'
+  run-build:
+    description: Run build
+    default: 'true'
+  lint-command:
+    description: Command to run for linting
+    default: 'pnpm lint'
+  format-check-command:
+    description: Command to run for format checking
+    default: 'pnpm format:check'
+  typecheck-command:
+    description: Command to run for type checking
+    default: 'pnpm typecheck'
+  test-command:
+    description: Command to run for tests
+    default: 'pnpm test'
+  build-command:
+    description: Command to run for build
+    default: 'pnpm build'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Run ESLint
+      if: inputs.run-lint == 'true'
+      shell: bash
+      run: ${{ inputs.lint-command }}
+
+    - name: Check formatting
+      if: inputs.run-lint == 'true'
+      shell: bash
+      run: ${{ inputs.format-check-command }}
+
+    - name: Run type check
+      if: inputs.run-typecheck == 'true'
+      shell: bash
+      run: ${{ inputs.typecheck-command }}
+
+    - name: Run tests
+      if: inputs.run-test == 'true'
+      shell: bash
+      run: ${{ inputs.test-command }}
+
+    - name: Build packages
+      if: inputs.run-build == 'true'
+      shell: bash
+      run: ${{ inputs.build-command }}

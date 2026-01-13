@@ -15,6 +15,16 @@ permissions:
 
 jobs:
   publish:
-    uses: ./.github/workflows/publish-jsr.yml
-    with:
-      packages: '["packages/eslint", "packages/typescript", "packages/prettier", "packages/commitlint"]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - packages/eslint
+          - packages/typescript
+          - packages/prettier
+          - packages/commitlint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/publish/jsr
+        working-directory: ${{ matrix.package }}

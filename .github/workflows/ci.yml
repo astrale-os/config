@@ -12,7 +12,19 @@ concurrency:
 
 jobs:
   ci:
-    uses: ./.github/workflows/ci-default.yml
-    with:
-      run-test: false
-      run-typecheck: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ci
+        with:
+          run-test: 'false'
+          run-typecheck: 'false'
+
+  commitlint:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Validate PR title
+        run: echo "${{ github.event.pull_request.title }}" | pnpm commitlint

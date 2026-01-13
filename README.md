@@ -1,6 +1,6 @@
 # @astrale/config
 
-Shared configurations and callable workflows for Astrale TypeScript monorepos.
+Shared configurations and composite actions for Astrale TypeScript monorepos.
 
 ## Packages
 
@@ -74,53 +74,65 @@ export default createConfig({
 
 ---
 
-## Workflows
+## Actions
 
-Callable workflows organized by category in `.github/workflows/`.
+Composite actions organized by category in `.github/actions/`.
 
 ```
-.github/workflows/
-├── ci/
-│   └── default.yml      # Lint, typecheck, test, build
+.github/actions/
+├── setup/           # pnpm + Node.js + install
+├── ci/              # lint, typecheck, test, build
 ├── publish/
-│   ├── jsr.yml          # Publish to JSR
-│   └── npm.yml          # Publish to npm/GitHub Packages
-└── release/
-    └── default.yml      # Release Please
+│   ├── jsr/         # Publish to JSR
+│   └── npm/         # Publish to npm/GitHub Packages
+└── release/         # Release Please
 ```
 
-### ci/default.yml
+### setup
 
-Full CI pipeline with lint, typecheck, test, and build.
+Setup pnpm, Node.js, and install dependencies.
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: astrale-os/config/.github/actions/setup@main
+```
+
+| Input               | Default  | Description               |
+| ------------------- | -------- | ------------------------- |
+| `node-version-file` | `.nvmrc` | Path to Node version file |
+
+### ci
+
+Run lint, typecheck, test, and build.
 
 ```yaml
 jobs:
   ci:
-    uses: astrale-os/config/.github/workflows/ci/default.yml@main
-    with:
-      run-lint: true
-      run-typecheck: true
-      run-test: true
-      run-build: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astrale-os/config/.github/actions/ci@main
+        with:
+          run-test: 'false' # optional
 ```
 
-| Input                  | Type    | Default             | Description               |
-| ---------------------- | ------- | ------------------- | ------------------------- |
-| `node-version-file`    | string  | `.nvmrc`            | Path to Node version file |
-| `run-lint`             | boolean | `true`              | Run ESLint and Prettier   |
-| `run-typecheck`        | boolean | `true`              | Run TypeScript checks     |
-| `run-test`             | boolean | `true`              | Run tests                 |
-| `run-build`            | boolean | `true`              | Run build                 |
-| `lint-command`         | string  | `pnpm lint`         | Lint command              |
-| `format-check-command` | string  | `pnpm format:check` | Format check command      |
-| `typecheck-command`    | string  | `pnpm typecheck`    | Typecheck command         |
-| `test-command`         | string  | `pnpm test`         | Test command              |
-| `build-command`        | string  | `pnpm build`        | Build command             |
-| `commitlint-command`   | string  | `pnpm commitlint`   | Commitlint command        |
+| Input                  | Default             | Description               |
+| ---------------------- | ------------------- | ------------------------- |
+| `node-version-file`    | `.nvmrc`            | Path to Node version file |
+| `run-lint`             | `true`              | Run ESLint and Prettier   |
+| `run-typecheck`        | `true`              | Run TypeScript checks     |
+| `run-test`             | `true`              | Run tests                 |
+| `run-build`            | `true`              | Run build                 |
+| `lint-command`         | `pnpm lint`         | Lint command              |
+| `format-check-command` | `pnpm format:check` | Format check command      |
+| `typecheck-command`    | `pnpm typecheck`    | Typecheck command         |
+| `test-command`         | `pnpm test`         | Test command              |
+| `build-command`        | `pnpm build`        | Build command             |
 
-### publish/jsr.yml
+### publish/jsr
 
-Publish packages to JSR with OIDC authentication.
+Publish a package to JSR with OIDC authentication.
 
 ```yaml
 permissions:
@@ -129,52 +141,56 @@ permissions:
 
 jobs:
   publish:
-    uses: astrale-os/config/.github/workflows/publish/jsr.yml@main
-    with:
-      packages: '["packages/foo", "packages/bar"]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astrale-os/config/.github/actions/publish/jsr@main
 ```
 
-| Input               | Type    | Default  | Description                       |
-| ------------------- | ------- | -------- | --------------------------------- |
-| `packages`          | string  | required | JSON array of package directories |
-| `node-version-file` | string  | `.nvmrc` | Path to Node version file         |
-| `allow-slow-types`  | boolean | `true`   | Allow slow types in JSR           |
+| Input               | Default  | Description               |
+| ------------------- | -------- | ------------------------- |
+| `node-version-file` | `.nvmrc` | Path to Node version file |
+| `allow-slow-types`  | `true`   | Allow slow types in JSR   |
 
-### publish/npm.yml
+### publish/npm
 
 Publish packages to npm or GitHub Packages.
 
 ```yaml
 jobs:
   publish:
-    uses: astrale-os/config/.github/workflows/publish/npm.yml@main
-    with:
-      scope: '@astrale-os'
-      access: 'restricted'
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }} # optional for GitHub Packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astrale-os/config/.github/actions/publish/npm@main
+        with:
+          scope: '@astrale-os'
+          token: ${{ github.token }}
 ```
 
-| Input               | Type   | Default                      | Description                     |
-| ------------------- | ------ | ---------------------------- | ------------------------------- |
-| `node-version-file` | string | `.nvmrc`                     | Path to Node version file       |
-| `registry-url`      | string | `https://npm.pkg.github.com` | npm registry URL                |
-| `scope`             | string | required                     | npm scope (e.g., `@astrale-os`) |
-| `access`            | string | `restricted`                 | Package access level            |
+| Input               | Default                      | Description                     |
+| ------------------- | ---------------------------- | ------------------------------- |
+| `node-version-file` | `.nvmrc`                     | Path to Node version file       |
+| `registry-url`      | `https://npm.pkg.github.com` | npm registry URL                |
+| `scope`             | required                     | npm scope (e.g., `@astrale-os`) |
+| `access`            | `restricted`                 | Package access level            |
+| `token`             | required                     | npm registry token              |
 
-### release/default.yml
+### release
 
 Automated versioning with Release Please.
 
 ```yaml
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   release:
-    uses: astrale-os/config/.github/workflows/release/default.yml@main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astrale-os/config/.github/actions/release@main
 ```
-
-| Input           | Type   | Default                         | Description        |
-| --------------- | ------ | ------------------------------- | ------------------ |
-| `config-file`   | string | `.release-please-config.json`   | Config file path   |
-| `manifest-file` | string | `.release-please-manifest.json` | Manifest file path |
 
 **Outputs:** `releases_created`, `paths_released`

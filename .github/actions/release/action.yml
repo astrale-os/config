@@ -1,0 +1,19 @@
+name: Release
+description: Run Release Please for automated versioning
+
+outputs:
+  releases_created:
+    description: Whether any releases were created
+    value: ${{ steps.release.outputs.releases_created }}
+  paths_released:
+    description: JSON array of paths that were released
+    value: ${{ steps.release.outputs.paths_released }}
+
+runs:
+  using: composite
+  steps:
+    - name: Release Please
+      id: release
+      uses: googleapis/release-please-action@v4
+      with:
+        token: ${{ github.token }}

@@ -1,0 +1,51 @@
+name: Publish to npm
+description: Publish packages to npm or GitHub Packages registry
+
+inputs:
+  node-version-file:
+    description: Path to .nvmrc or similar file
+    default: '.nvmrc'
+  registry-url:
+    description: npm registry URL
+    default: 'https://npm.pkg.github.com'
+  scope:
+    description: npm scope (e.g., @astrale-os)
+    required: true
+  access:
+    description: Package access level (public or restricted)
+    default: 'restricted'
+  token:
+    description: npm registry token
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+        cache: pnpm
+
+    - name: Configure npm registry
+      shell: bash
+      run: |
+        echo "//${{ inputs.registry-url }}/:_authToken=${{ inputs.token }}" >> ~/.npmrc
+        echo "${{ inputs.scope }}:registry=https:${{ inputs.registry-url }}" >> ~/.npmrc
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Build packages
+      shell: bash
+      run: pnpm build
+
+    - name: Publish packages
+      shell: bash
+      run: pnpm -r publish --access ${{ inputs.access }} --no-git-checks 2>&1 | grep -v "already published" || true
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
