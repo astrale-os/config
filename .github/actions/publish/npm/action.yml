@@ -6,8 +6,8 @@ inputs:
     description: Path to .nvmrc or similar file
     default: '.nvmrc'
   registry-url:
-    description: npm registry URL
-    default: 'https://npm.pkg.github.com'
+    description: npm registry URL (without https://)
+    default: 'npm.pkg.github.com'
   scope:
     description: npm scope (e.g., @astrale-os)
     required: true
@@ -29,12 +29,8 @@ runs:
       with:
         node-version-file: ${{ inputs.node-version-file }}
         cache: pnpm
-
-    - name: Configure npm registry
-      shell: bash
-      run: |
-        echo "//${{ inputs.registry-url }}/:_authToken=${{ inputs.token }}" >> ~/.npmrc
-        echo "${{ inputs.scope }}:registry=https:${{ inputs.registry-url }}" >> ~/.npmrc
+        registry-url: https://${{ inputs.registry-url }}
+        scope: ${{ inputs.scope }}
 
     - name: Install dependencies
       shell: bash
