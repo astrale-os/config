@@ -196,8 +196,10 @@ jobs:
           token: ${{ github.token }}
 ```
 
-| Input   | Default  | Description                       |
-| ------- | -------- | --------------------------------- |
-| `token` | required | GitHub token for releases and PRs |
+| Input           | Default                         | Description                       |
+| --------------- | ------------------------------- | --------------------------------- |
+| `token`         | required                        | GitHub token for releases and PRs |
+| `config-file`   | `.release-please-config.json`   | Path to config file               |
+| `manifest-file` | `.release-please-manifest.json` | Path to manifest file             |
 
 **Outputs:** `releases_created`, `paths_released`

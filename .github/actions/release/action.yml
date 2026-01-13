@@ -5,6 +5,12 @@ inputs:
   token:
     description: GitHub token for creating releases and PRs
     required: true
+  config-file:
+    description: Path to release-please config file
+    default: '.release-please-config.json'
+  manifest-file:
+    description: Path to release-please manifest file
+    default: '.release-please-manifest.json'
 
 outputs:
   releases_created:
@@ -22,3 +28,5 @@ runs:
       uses: googleapis/release-please-action@v4
       with:
         token: ${{ inputs.token }}
+        config-file: ${{ inputs.config-file }}
+        manifest-file: ${{ inputs.manifest-file }}
