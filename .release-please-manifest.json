@@ -1,7 +1,7 @@
 {
-  "packages/eslint": "0.1.0",
-  "packages/typescript": "0.1.0",
-  "packages/prettier": "0.1.0",
-  "packages/commitlint": "0.1.0",
-  "packages/renovate": "0.1.0"
+  "packages/eslint": "1.0.0",
+  "packages/typescript": "1.0.0",
+  "packages/prettier": "1.0.0",
+  "packages/commitlint": "1.0.0",
+  "packages/renovate": "1.0.0"
 }

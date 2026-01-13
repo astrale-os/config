@@ -1,6 +1,6 @@
 {
   "name": "@astrale-os/commitlint-config",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Shared Commitlint configuration for Astrale OS projects",
   "type": "module",
   "main": "./src/index.js",
