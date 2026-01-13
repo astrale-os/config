@@ -1,25 +1,23 @@
-# @astrale-os/config
+# @astrale/config
 
-Shared configurations and reusable workflows for Astrale OS TypeScript monorepos.
+Shared configurations and callable workflows for Astrale TypeScript monorepos.
 
 ## Packages
 
 | Package | JSR | Description |
 |---------|-----|-------------|
-| `@astrale-os/eslint-config` | [![JSR](https://jsr.io/badges/@astrale-os/eslint-config)](https://jsr.io/@astrale-os/eslint-config) | ESLint flat config for TypeScript |
-| `@astrale-os/typescript-config` | [![JSR](https://jsr.io/badges/@astrale-os/typescript-config)](https://jsr.io/@astrale-os/typescript-config) | Base tsconfig presets |
-| `@astrale-os/prettier-config` | [![JSR](https://jsr.io/badges/@astrale-os/prettier-config)](https://jsr.io/@astrale-os/prettier-config) | Prettier formatting rules |
-| `@astrale-os/commitlint-config` | [![JSR](https://jsr.io/badges/@astrale-os/commitlint-config)](https://jsr.io/@astrale-os/commitlint-config) | Conventional commits config |
-| `@astrale-os/renovate-config` | — | Renovate dependency updates |
+| `@astrale/eslint-config` | [![JSR](https://jsr.io/badges/@astrale/eslint-config)](https://jsr.io/@astrale/eslint-config) | ESLint flat config for TypeScript |
+| `@astrale/typescript-config` | [![JSR](https://jsr.io/badges/@astrale/typescript-config)](https://jsr.io/@astrale/typescript-config) | Base tsconfig presets |
+| `@astrale/prettier-config` | [![JSR](https://jsr.io/badges/@astrale/prettier-config)](https://jsr.io/@astrale/prettier-config) | Prettier formatting rules |
+| `@astrale/commitlint-config` | [![JSR](https://jsr.io/badges/@astrale/commitlint-config)](https://jsr.io/@astrale/commitlint-config) | Conventional commits config |
+| `@astrale/renovate-config` | — | Renovate dependency updates |
 
 ## Installation
 
-```bash
-# pnpm
-pnpm add -D jsr:@astrale-os/eslint-config jsr:@astrale-os/typescript-config jsr:@astrale-os/prettier-config jsr:@astrale-os/commitlint-config
+Requires **pnpm 10.9+** for native JSR support.
 
-# npm
-npx jsr add -D @astrale-os/eslint-config @astrale-os/typescript-config @astrale-os/prettier-config @astrale-os/commitlint-config
+```bash
+pnpm add -D jsr:@astrale/eslint-config jsr:@astrale/typescript-config jsr:@astrale/prettier-config jsr:@astrale/commitlint-config
 ```
 
 ## Config Usage
@@ -28,7 +26,7 @@ npx jsr add -D @astrale-os/eslint-config @astrale-os/typescript-config @astrale-
 
 ```js
 // eslint.config.js
-import { createConfig } from '@astrale-os/eslint-config'
+import { createConfig } from '@astrale/eslint-config'
 
 export default createConfig({
   tsconfigRootDir: import.meta.dirname,
@@ -41,7 +39,7 @@ export default createConfig({
 
 ```json
 {
-  "extends": "@astrale-os/typescript-config/library",
+  "extends": "@astrale/typescript-config/library",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src"
@@ -54,14 +52,14 @@ Presets: `/base`, `/library`, `/app`
 ### Prettier
 
 ```json
-{ "prettier": "@astrale-os/prettier-config" }
+{ "prettier": "@astrale/prettier-config" }
 ```
 
 ### Commitlint
 
 ```js
 // commitlint.config.js
-import { createConfig } from '@astrale-os/commitlint-config'
+import { createConfig } from '@astrale/commitlint-config'
 
 export default createConfig({
   scopes: ['server', 'client', 'deps', 'ci'],
@@ -76,38 +74,24 @@ export default createConfig({
 
 ---
 
-## Reusable Workflows
+## Shared Workflows
 
-### CI Workflow
+Callable workflows located in `.github/workflows/shared/`.
+
+### CI
 
 Full CI pipeline with lint, typecheck, test, and build.
 
 ```yaml
-# .github/workflows/ci.yml
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   ci:
-    uses: astrale-os/config/.github/workflows/reusable-ci.yml@main
+    uses: astrale-os/config/.github/workflows/shared/ci.yml@main
     with:
-      # All inputs are optional with sensible defaults
       run-lint: true
       run-typecheck: true
       run-test: true
       run-build: true
 ```
-
-**Inputs:**
 
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -125,31 +109,19 @@ jobs:
 
 ### Publish to JSR
 
-Publish packages to JSR registry with OIDC authentication.
+Publish packages to JSR with OIDC authentication.
 
 ```yaml
-# .github/workflows/publish-jsr.yml
-name: Publish to JSR
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'packages/*/jsr.json'
-  workflow_dispatch:
-
 permissions:
   contents: read
   id-token: write
 
 jobs:
   publish:
-    uses: astrale-os/config/.github/workflows/reusable-publish-jsr.yml@main
+    uses: astrale-os/config/.github/workflows/shared/publish-jsr.yml@main
     with:
       packages: '["packages/foo", "packages/bar"]'
 ```
-
-**Inputs:**
 
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -157,32 +129,20 @@ jobs:
 | `node-version-file` | string | `.nvmrc` | Path to Node version file |
 | `allow-slow-types` | boolean | `true` | Allow slow types in JSR |
 
-### Publish to npm/GitHub Packages
+### Publish to npm
 
-Publish packages to npm or GitHub Packages registry.
+Publish packages to npm or GitHub Packages.
 
 ```yaml
-# .github/workflows/publish-npm.yml
-name: Publish to GitHub Packages
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - '.release-please-manifest.json'
-  workflow_dispatch:
-
 jobs:
   publish:
-    uses: astrale-os/config/.github/workflows/reusable-publish-npm.yml@main
+    uses: astrale-os/config/.github/workflows/shared/publish-npm.yml@main
     with:
       scope: '@astrale-os'
-      access: 'restricted'  # or 'public' for npm
+      access: 'restricted'
     secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}  # optional, defaults to GITHUB_TOKEN
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}  # optional for GitHub Packages
 ```
-
-**Inputs:**
 
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -191,50 +151,19 @@ jobs:
 | `scope` | string | required | npm scope (e.g., `@astrale-os`) |
 | `access` | string | `restricted` | Package access level |
 
-### Release Please
+### Release
 
-Automated versioning and changelog generation.
+Automated versioning with Release Please.
 
 ```yaml
-# .github/workflows/release.yml
-name: Release
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
 jobs:
   release:
-    uses: astrale-os/config/.github/workflows/reusable-release.yml@main
-    with:
-      config-file: '.release-please-config.json'
-      manifest-file: '.release-please-manifest.json'
+    uses: astrale-os/config/.github/workflows/shared/release.yml@main
 ```
 
-**Outputs:**
+| Input | Type | Default | Description |
+|-------|------|---------|-------------|
+| `config-file` | string | `.release-please-config.json` | Config file path |
+| `manifest-file` | string | `.release-please-manifest.json` | Manifest file path |
 
-| Output | Description |
-|--------|-------------|
-| `releases_created` | Whether any releases were created |
-| `paths_released` | JSON array of released paths |
-
----
-
-## Configuration Reference
-
-### Prettier Rules
-
-- `semi: false`
-- `singleQuote: true`
-- `trailingComma: 'all'`
-- `printWidth: 100`
-- `tabWidth: 2`
-
-### TypeScript Base Config
-
-- `target: ES2022`
-- `module: ESNext`
-- `moduleResolution: bundler`
-- `strict: true`
-- `verbatimModuleSyntax: true`
+**Outputs:** `releases_created`, `paths_released`

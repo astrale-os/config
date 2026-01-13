@@ -1,4 +1,4 @@
-# Reusable workflow for Release Please
+# Callable workflow for Release Please
 name: Release
 
 on:

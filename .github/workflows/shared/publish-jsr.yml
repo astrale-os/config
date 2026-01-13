@@ -1,4 +1,4 @@
-# Reusable workflow to publish packages to JSR
+# Callable workflow to publish packages to JSR
 name: Publish to JSR
 
 on:

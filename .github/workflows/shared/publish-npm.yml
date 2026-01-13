@@ -1,5 +1,5 @@
-# Reusable workflow to publish packages to GitHub Packages (npm)
-name: Publish to GitHub Packages
+# Callable workflow to publish packages to npm registry (GitHub Packages or npmjs.com)
+name: Publish to npm
 
 on:
   workflow_call:

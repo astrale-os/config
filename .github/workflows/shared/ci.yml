@@ -1,4 +1,4 @@
-# Reusable CI workflow for TypeScript monorepos
+# Callable CI workflow for TypeScript monorepos
 name: CI
 
 on:

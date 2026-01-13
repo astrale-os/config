@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: ./.github/workflows/reusable-ci.yml
+    uses: ./.github/workflows/shared/ci.yml
     with:
       run-test: false
       run-typecheck: false

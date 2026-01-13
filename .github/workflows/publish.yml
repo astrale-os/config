@@ -15,6 +15,6 @@ permissions:
 
 jobs:
   publish:
-    uses: ./.github/workflows/reusable-publish-jsr.yml
+    uses: ./.github/workflows/shared/publish-jsr.yml
     with:
       packages: '["packages/eslint", "packages/typescript", "packages/prettier", "packages/commitlint"]'
