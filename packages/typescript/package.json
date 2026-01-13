@@ -1,0 +1,32 @@
+{
+  "name": "@astrale-os/typescript-config",
+  "version": "0.1.0",
+  "description": "Shared TypeScript configurations for Astrale OS projects",
+  "type": "module",
+  "exports": {
+    "./base": "./base.json",
+    "./library": "./library.json",
+    "./app": "./app.json"
+  },
+  "files": [
+    "*.json",
+    "!package.json",
+    "!tsconfig.json"
+  ],
+  "keywords": [
+    "astrale",
+    "typescript",
+    "config",
+    "tsconfig"
+  ],
+  "author": "Astrale",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/astrale-os/config.git",
+    "directory": "packages/typescript"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}

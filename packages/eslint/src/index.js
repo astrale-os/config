@@ -1,0 +1,88 @@
+import eslint from '@eslint/js'
+import tseslint from 'typescript-eslint'
+import eslintConfigPrettier from 'eslint-config-prettier'
+
+/**
+ * @typedef {Object} ConfigOptions
+ * @property {string[]} [testPatterns] - Glob patterns for test files (default: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.perf.ts'])
+ * @property {string[]} [ignorePatterns] - Additional patterns to ignore
+ */
+
+/**
+ * Creates a base ESLint configuration for Astrale OS TypeScript projects.
+ *
+ * @param {ConfigOptions} [options]
+ * @returns {import('typescript-eslint').Config}
+ */
+export function createConfig(options = {}) {
+  const {
+    testPatterns = ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.perf.ts'],
+    ignorePatterns = [],
+  } = options
+
+  return tseslint.config(
+    eslint.configs.recommended,
+    ...tseslint.configs.recommended,
+    eslintConfigPrettier,
+    {
+      languageOptions: {
+        parserOptions: {
+          projectService: true,
+          tsconfigRootDir: import.meta.dirname,
+        },
+      },
+    },
+    {
+      rules: {
+        // TypeScript rules - pragmatic defaults
+        '@typescript-eslint/no-unused-vars': [
+          'error',
+          { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+        ],
+        '@typescript-eslint/no-explicit-any': 'warn',
+        '@typescript-eslint/explicit-function-return-type': 'off',
+        '@typescript-eslint/explicit-module-boundary-types': 'off',
+        '@typescript-eslint/no-non-null-assertion': 'off',
+        '@typescript-eslint/consistent-type-imports': [
+          'warn',
+          { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
+        ],
+
+        // General rules
+        'no-console': 'warn',
+        'no-control-regex': 'off',
+        'prefer-const': 'error',
+        eqeqeq: ['error', 'always'],
+      },
+    },
+    {
+      // More permissive rules for test files
+      files: testPatterns,
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+        '@typescript-eslint/no-unsafe-member-access': 'off',
+        '@typescript-eslint/no-unsafe-call': 'off',
+        '@typescript-eslint/no-unsafe-argument': 'off',
+        '@typescript-eslint/no-unused-vars': 'off',
+        'no-console': 'off',
+      },
+    },
+    {
+      // Default ignore patterns
+      ignores: [
+        '**/dist/**',
+        '**/node_modules/**',
+        '**/coverage/**',
+        '**/*.js',
+        '**/*.mjs',
+        '**/*.cjs',
+        'eslint.config.js',
+        '**/vitest.config.ts',
+        ...ignorePatterns,
+      ],
+    }
+  )
+}
+
+export default createConfig

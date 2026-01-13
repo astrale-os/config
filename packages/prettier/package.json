@@ -1,0 +1,31 @@
+{
+  "name": "@astrale-os/prettier-config",
+  "version": "0.1.0",
+  "description": "Shared Prettier configuration for Astrale OS projects",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "keywords": [
+    "astrale",
+    "prettier",
+    "config"
+  ],
+  "author": "Astrale",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/astrale-os/config.git",
+    "directory": "packages/prettier"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "peerDependencies": {
+    "prettier": "^3.0.0"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@astrale-os/commitlint-config",
+  "version": "0.1.0",
+  "description": "Shared Commitlint configuration for Astrale OS projects",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "keywords": [
+    "astrale",
+    "commitlint",
+    "config",
+    "conventional-commits"
+  ],
+  "author": "Astrale",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/astrale-os/config.git",
+    "directory": "packages/commitlint"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "dependencies": {
+    "@commitlint/config-conventional": "^20.3.1"
+  },
+  "peerDependencies": {
+    "@commitlint/cli": "^20.0.0"
+  }
+}
