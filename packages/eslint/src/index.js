@@ -3,16 +3,12 @@ import tseslint from 'typescript-eslint'
 import eslintConfigPrettier from 'eslint-config-prettier'
 
 /**
- * @typedef {Object} ConfigOptions
- * @property {string} [tsconfigRootDir] - Root directory for TypeScript config (required for type-aware linting)
- * @property {string[]} [testPatterns] - Glob patterns for test files (default: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.perf.ts'])
- * @property {string[]} [ignorePatterns] - Additional patterns to ignore
- */
-
-/**
  * Creates a base ESLint configuration for Astrale OS TypeScript projects.
  *
- * @param {ConfigOptions} [options]
+ * @param {Object} [options] - Configuration options
+ * @param {string} [options.tsconfigRootDir] - Root directory for TypeScript config (required for type-aware linting)
+ * @param {string[]} [options.testPatterns] - Glob patterns for test files
+ * @param {string[]} [options.ignorePatterns] - Additional patterns to ignore
  * @returns {import('typescript-eslint').Config}
  */
 export function createConfig(options = {}) {
