@@ -27,4 +27,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/publish/jsr
-        working-directory: ${{ matrix.package }}
+        with:
+          working-directory: ${{ matrix.package }}

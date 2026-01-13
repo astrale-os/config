@@ -147,10 +147,11 @@ jobs:
       - uses: astrale-os/config/.github/actions/publish/jsr@main
 ```
 
-| Input               | Default  | Description               |
-| ------------------- | -------- | ------------------------- |
-| `node-version-file` | `.nvmrc` | Path to Node version file |
-| `allow-slow-types`  | `true`   | Allow slow types in JSR   |
+| Input               | Default  | Description                   |
+| ------------------- | -------- | ----------------------------- |
+| `node-version-file` | `.nvmrc` | Path to Node version file     |
+| `allow-slow-types`  | `true`   | Allow slow types in JSR       |
+| `working-directory` | `.`      | Directory containing jsr.json |
 
 ### publish/npm
 
@@ -191,6 +192,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astrale-os/config/.github/actions/release@main
+        with:
+          token: ${{ github.token }}
 ```
+
+| Input   | Default  | Description                       |
+| ------- | -------- | --------------------------------- |
+| `token` | required | GitHub token for releases and PRs |
 
 **Outputs:** `releases_created`, `paths_released`
