@@ -1,5 +1,5 @@
 {
-  "name": "@astrale-os/typescript-config",
+  "name": "@astrale/typescript-config",
   "version": "1.0.0",
   "license": "MIT",
   "exports": {

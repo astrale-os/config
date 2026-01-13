@@ -1,5 +1,5 @@
 {
-  "name": "@astrale-os/commitlint-config",
+  "name": "@astrale/commitlint-config",
   "version": "1.0.0",
   "license": "MIT",
   "exports": "./src/index.js"
