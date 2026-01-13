@@ -42,6 +42,20 @@ runs:
 
     - name: Publish packages
       shell: bash
-      run: pnpm -r publish --access ${{ inputs.access }} --no-git-checks 2>&1 | grep -v "already published" || true
+      run: |
+        # Publish and capture output
+        output=$(pnpm -r publish --access ${{ inputs.access }} --no-git-checks 2>&1) || exit_code=$?
+
+        # Print output for debugging
+        echo "$output"
+
+        # Check if there was an error (excluding "already published" which is expected)
+        if [ -n "$exit_code" ]; then
+          # Check if ALL errors are just "already published"
+          if echo "$output" | grep -q "npm error" && ! echo "$output" | grep "npm error" | grep -q "already published"; then
+            echo "::error::Publish failed with errors"
+            exit 1
+          fi
+        fi
       env:
         NODE_AUTH_TOKEN: ${{ inputs.token }}

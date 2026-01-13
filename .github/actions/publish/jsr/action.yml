@@ -8,9 +8,9 @@ inputs:
   allow-slow-types:
     description: Allow publishing packages with slow types
     default: 'true'
-  working-directory:
-    description: Directory containing jsr.json
-    default: '.'
+  package:
+    description: Package directory to publish (relative to repo root)
+    required: true
 
 runs:
   using: composite
@@ -28,12 +28,23 @@ runs:
       shell: bash
       run: pnpm install --frozen-lockfile
 
+    - name: Build packages
+      shell: bash
+      run: pnpm build
+
     - name: Publish to JSR
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
+      working-directory: ${{ inputs.package }}
       run: |
         FLAGS=""
         if [ "${{ inputs.allow-slow-types }}" = "true" ]; then
           FLAGS="--allow-slow-types"
         fi
-        npx jsr publish $FLAGS || echo "Package may already exist"
+        npx jsr publish $FLAGS || {
+          # Check if it's just "already published" error
+          if [ $? -eq 1 ]; then
+            echo "::warning::Package may already be published at this version"
+          else
+            exit 1
+          fi
+        }
