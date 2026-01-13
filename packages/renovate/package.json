@@ -1,10 +1,12 @@
 {
   "name": "@astrale-os/renovate-config",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Shared Renovate configuration for Astrale OS projects",
   "renovate-config": {
     "default": {
-      "extends": ["local>astrale-os/config:packages/renovate/default"]
+      "extends": [
+        "local>astrale-os/config:packages/renovate/default"
+      ]
     }
   },
   "keywords": [

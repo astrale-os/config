@@ -1,6 +1,6 @@
 {
   "name": "@astrale-os/prettier-config",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Shared Prettier configuration for Astrale OS projects",
   "type": "module",
   "main": "./src/index.js",
