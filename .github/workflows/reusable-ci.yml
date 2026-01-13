@@ -1,0 +1,170 @@
+# Reusable CI workflow for TypeScript monorepos
+name: CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version-file:
+        description: 'Path to .nvmrc or similar file'
+        type: string
+        default: '.nvmrc'
+      run-lint:
+        description: 'Run ESLint and Prettier checks'
+        type: boolean
+        default: true
+      run-typecheck:
+        description: 'Run TypeScript type checking'
+        type: boolean
+        default: true
+      run-test:
+        description: 'Run tests'
+        type: boolean
+        default: true
+      run-build:
+        description: 'Run build'
+        type: boolean
+        default: true
+      lint-command:
+        description: 'Command to run for linting'
+        type: string
+        default: 'pnpm lint'
+      format-check-command:
+        description: 'Command to run for format checking'
+        type: string
+        default: 'pnpm format:check'
+      typecheck-command:
+        description: 'Command to run for type checking'
+        type: string
+        default: 'pnpm typecheck'
+      test-command:
+        description: 'Command to run for tests'
+        type: string
+        default: 'pnpm test'
+      build-command:
+        description: 'Command to run for build'
+        type: string
+        default: 'pnpm build'
+      commitlint-command:
+        description: 'Command to run for commit linting'
+        type: string
+        default: 'pnpm commitlint'
+
+jobs:
+  commitlint:
+    name: Lint PR Title
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate PR title
+        run: echo "${{ github.event.pull_request.title }}" | ${{ inputs.commitlint-command }}
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    if: inputs.run-lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: ${{ inputs.lint-command }}
+
+      - name: Check formatting
+        run: ${{ inputs.format-check-command }}
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    if: inputs.run-typecheck
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run type check
+        run: ${{ inputs.typecheck-command }}
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    if: inputs.run-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: ${{ inputs.test-command }}
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    if: inputs.run-build
+    needs: [lint, typecheck, test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: ${{ inputs.build-command }}

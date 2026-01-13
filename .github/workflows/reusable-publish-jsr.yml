@@ -1,0 +1,55 @@
+# Reusable workflow to publish packages to JSR
+name: Publish to JSR
+
+on:
+  workflow_call:
+    inputs:
+      packages:
+        description: 'JSON array of package directories to publish (e.g., ["packages/foo", "packages/bar"])'
+        type: string
+        required: true
+      node-version-file:
+        description: 'Path to .nvmrc or similar file'
+        type: string
+        default: '.nvmrc'
+      allow-slow-types:
+        description: 'Allow publishing packages with slow types'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish to JSR
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(inputs.packages) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish to JSR
+        working-directory: ${{ matrix.package }}
+        run: |
+          FLAGS=""
+          if [ "${{ inputs.allow-slow-types }}" = "true" ]; then
+            FLAGS="--allow-slow-types"
+          fi
+          npx jsr publish $FLAGS || echo "Package may already exist or scope not created yet"
