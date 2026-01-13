@@ -74,18 +74,29 @@ export default createConfig({
 
 ---
 
-## Shared Workflows
+## Workflows
 
-Callable workflows located in `.github/workflows/shared/`.
+Callable workflows organized by category in `.github/workflows/`.
 
-### CI
+```
+.github/workflows/
+├── ci/
+│   └── default.yml      # Lint, typecheck, test, build
+├── publish/
+│   ├── jsr.yml          # Publish to JSR
+│   └── npm.yml          # Publish to npm/GitHub Packages
+└── release/
+    └── default.yml      # Release Please
+```
+
+### ci/default.yml
 
 Full CI pipeline with lint, typecheck, test, and build.
 
 ```yaml
 jobs:
   ci:
-    uses: astrale-os/config/.github/workflows/shared/ci.yml@main
+    uses: astrale-os/config/.github/workflows/ci/default.yml@main
     with:
       run-lint: true
       run-typecheck: true
@@ -107,7 +118,7 @@ jobs:
 | `build-command`        | string  | `pnpm build`        | Build command             |
 | `commitlint-command`   | string  | `pnpm commitlint`   | Commitlint command        |
 
-### Publish to JSR
+### publish/jsr.yml
 
 Publish packages to JSR with OIDC authentication.
 
@@ -118,7 +129,7 @@ permissions:
 
 jobs:
   publish:
-    uses: astrale-os/config/.github/workflows/shared/publish-jsr.yml@main
+    uses: astrale-os/config/.github/workflows/publish/jsr.yml@main
     with:
       packages: '["packages/foo", "packages/bar"]'
 ```
@@ -129,14 +140,14 @@ jobs:
 | `node-version-file` | string  | `.nvmrc` | Path to Node version file         |
 | `allow-slow-types`  | boolean | `true`   | Allow slow types in JSR           |
 
-### Publish to npm
+### publish/npm.yml
 
 Publish packages to npm or GitHub Packages.
 
 ```yaml
 jobs:
   publish:
-    uses: astrale-os/config/.github/workflows/shared/publish-npm.yml@main
+    uses: astrale-os/config/.github/workflows/publish/npm.yml@main
     with:
       scope: '@astrale-os'
       access: 'restricted'
@@ -151,14 +162,14 @@ jobs:
 | `scope`             | string | required                     | npm scope (e.g., `@astrale-os`) |
 | `access`            | string | `restricted`                 | Package access level            |
 
-### Release
+### release/default.yml
 
 Automated versioning with Release Please.
 
 ```yaml
 jobs:
   release:
-    uses: astrale-os/config/.github/workflows/shared/release.yml@main
+    uses: astrale-os/config/.github/workflows/release/default.yml@main
 ```
 
 | Input           | Type   | Default                         | Description        |

@@ -11,4 +11,4 @@ concurrency:
 
 jobs:
   release:
-    uses: ./.github/workflows/shared/release.yml
+    uses: ./.github/workflows/release/default.yml
