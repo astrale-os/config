@@ -1,50 +1,79 @@
 # Docker Build and Push Action
 
-Build and push Docker images to GitHub Container Registry (ghcr.io).
+Build once, push to multiple registries. Supports:
+- **ghcr.io** (GitHub Container Registry)
+- **GAR** (Google Artifact Registry)
 
 ## Usage
+
+### Push to ghcr.io only
 
 ```yaml
 - uses: astrale-os/config/.github/actions/docker@main
   with:
-    token: ${{ secrets.GITHUB_TOKEN }}
     image-name: kernel
-    version: 1.2.3
+    version: 1.0.0
+    ghcr-token: ${{ secrets.GITHUB_TOKEN }}
     build-args: |
       NPM_TOKEN=${{ secrets.NPM_TOKEN }}
-      VERSION=1.2.3
+```
+
+### Push to GAR only
+
+```yaml
+- uses: astrale-os/config/.github/actions/docker@main
+  with:
+    image-name: kernel
+    version: 1.0.0
+    gar-project: astrale-tech-staging
+    gar-region: europe-west1
+    gar-workload-identity-provider: projects/123/locations/global/workloadIdentityPools/github/providers/github
+    gar-service-account: github-actions@astrale-tech-staging.iam.gserviceaccount.com
+```
+
+### Push to both registries (recommended)
+
+```yaml
+- uses: astrale-os/config/.github/actions/docker@main
+  with:
+    image-name: kernel
+    version: 1.0.0
+    ghcr-token: ${{ secrets.GITHUB_TOKEN }}
+    gar-project: astrale-tech-staging
+    gar-region: europe-west1
+    gar-workload-identity-provider: ${{ secrets.WIF_PROVIDER }}
+    gar-service-account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+    build-args: |
+      NPM_TOKEN=${{ secrets.NPM_TOKEN }}
 ```
 
 ## Inputs
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `token` | Yes | | GitHub token with `packages:write` |
-| `image-name` | Yes | | Docker image name |
-| `version` | Yes | | Image version tag |
+| `image-name` | Yes | - | Image name (without registry prefix) |
+| `version` | Yes | - | Version tag |
 | `dockerfile` | No | `Dockerfile` | Path to Dockerfile |
 | `context` | No | `.` | Docker build context |
-| `build-args` | No | | Build arguments (KEY=VALUE per line) |
-| `push` | No | `true` | Push image to registry |
+| `build-args` | No | - | Build args (KEY=VALUE, one per line) |
+| `push` | No | `true` | Push to registry |
+| `ghcr-token` | No | - | GitHub token (enables ghcr.io) |
+| `gar-project` | No | - | GCP project ID (enables GAR) |
+| `gar-region` | No | `europe-west1` | GAR region |
+| `gar-workload-identity-provider` | No | - | WIF provider for GAR auth |
+| `gar-service-account` | No | - | Service account for GAR auth |
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `image` | Full image path with version tag |
+| `ghcr-image` | Full ghcr.io image:tag |
+| `gar-image` | Full GAR image:tag |
 | `digest` | Image digest |
 
-## Image Tags
+## How it works
 
-Images are tagged with:
-- Version you provide (e.g., `1.2.3`)
-- Git SHA short (e.g., `abc1234`)
-- `latest`
-
-## Image URL
-
-```
-ghcr.io/{owner}/{image-name}:{tag}
-```
-
-Example: `ghcr.io/astrale-os/kernel:1.2.3`
+1. Authenticates to enabled registries (ghcr.io and/or GAR)
+2. Builds image **once** with Docker Buildx
+3. Pushes to **all enabled registries** in single operation
+4. Uses GitHub Actions cache for layers
