@@ -1,0 +1,43 @@
+name: Docker Copy
+description: Copy Docker image between registries using crane (no rebuild)
+
+inputs:
+  source:
+    description: Source image (full path with tag)
+    required: true
+  destination:
+    description: Destination image (full path with tag)
+    required: true
+  source-gcp-auth:
+    description: Use ambient GCP credentials for source (set to 'true' if source is GAR and GCP auth is already configured)
+    default: 'false'
+  dest-registry:
+    description: Destination registry for login
+    required: true
+  dest-username:
+    description: Destination registry username
+    required: true
+  dest-password:
+    description: Destination registry password
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install crane
+      uses: imjasonh/setup-crane@v0.4
+
+    - name: Login to GAR (source)
+      if: inputs.source-gcp-auth == 'true'
+      shell: bash
+      run: |
+        REGISTRY=$(echo "${{ inputs.source }}" | cut -d'/' -f1)
+        gcloud auth print-access-token | crane auth login "$REGISTRY" -u oauth2accesstoken --password-stdin
+
+    - name: Login to destination registry
+      shell: bash
+      run: crane auth login ${{ inputs.dest-registry }} -u ${{ inputs.dest-username }} -p ${{ inputs.dest-password }}
+
+    - name: Copy image
+      shell: bash
+      run: crane copy ${{ inputs.source }} ${{ inputs.destination }}
