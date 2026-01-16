@@ -28,3 +28,13 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Validate PR title
         run: echo "${{ github.event.pull_request.title }}" | pnpm commitlint
+
+  # Example merge-guard job (repos should customize dependencies)
+  # merge-guard:
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'pull_request'
+  #   steps:
+  #     - uses: astrale-os/config/.github/actions/merge-guard@main
+  #       with:
+  #         github-token: ${{ github.token }}
+  #         dependencies: '["kernel"]'

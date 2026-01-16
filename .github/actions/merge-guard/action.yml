@@ -1,0 +1,55 @@
+name: Merge Guard
+description: Ensures PRs in dependency repos are merged before this one
+
+inputs:
+  github-token:
+    description: GitHub token with repo read access
+    required: true
+  dependencies:
+    description: 'JSON array of dependency repos (e.g., ["kernel", "datastore"])'
+    default: '[]'
+  org:
+    description: GitHub organization name
+    default: 'astrale-os'
+
+runs:
+  using: composite
+  steps:
+    - name: Check dependency PRs
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        DEPENDENCIES: ${{ inputs.dependencies }}
+        ORG: ${{ inputs.org }}
+        BRANCH: ${{ github.head_ref }}
+      run: |
+        if [ -z "$BRANCH" ]; then
+          echo "Not a PR, skipping merge guard"
+          exit 0
+        fi
+        DEPS=$(echo "$DEPENDENCIES" | jq -r '.[]')
+        if [ -z "$DEPS" ]; then
+          echo "✓ No dependencies to check"
+          exit 0
+        fi
+        BLOCKING=""
+        for REPO in $DEPS; do
+          PR=$(gh pr list --repo "$ORG/$REPO" --head "$BRANCH" --state open --json number,url --jq '.[0]')
+          if [ -n "$PR" ]; then
+            PR_URL=$(echo "$PR" | jq -r '.url')
+            BLOCKING="$BLOCKING\n  - $REPO: $PR_URL"
+          fi
+        done
+        if [ -n "$BLOCKING" ]; then
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║  MERGE BLOCKED - Dependency PRs must be merged first       ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Open PRs on branch '$BRANCH':"
+          echo -e "$BLOCKING"
+          echo ""
+          echo "Merge these PRs first, then re-run this check."
+          exit 1
+        fi
+        echo "✓ No blocking PRs in dependencies"

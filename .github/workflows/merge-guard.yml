@@ -1,0 +1,19 @@
+name: Merge Guard
+
+on:
+  workflow_call:
+    inputs:
+      dependencies:
+        description: 'JSON array of dependency repos'
+        required: true
+        type: string
+
+jobs:
+  merge-guard:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: astrale-os/config/.github/actions/merge-guard@main
+        with:
+          github-token: ${{ github.token }}
+          dependencies: ${{ inputs.dependencies }}
