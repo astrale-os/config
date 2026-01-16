@@ -5,6 +5,18 @@ inputs:
   node-version-file:
     description: Path to .nvmrc or similar file
     default: '.nvmrc'
+  registry-url:
+    description: Optional npm registry URL (e.g. https://npm.pkg.github.com)
+    default: ''
+  scope:
+    description: Optional scope for registry (e.g. @astrale-os)
+    default: ''
+  token:
+    description: Optional auth token for registry
+    default: ''
+  frozen-lockfile:
+    description: Use frozen lockfile (set to false if lockfile may not exist)
+    default: 'true'
   build-first:
     description: Build packages before running checks (required for monorepos with inter-package dependencies)
     default: 'true'
@@ -42,15 +54,35 @@ runs:
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
 
-    - name: Setup Node.js
+    - name: Setup Node.js (with registry)
+      if: inputs.registry-url != ''
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+        cache: pnpm
+        registry-url: ${{ inputs.registry-url }}
+        scope: ${{ inputs.scope }}
+
+    - name: Setup Node.js (without registry)
+      if: inputs.registry-url == ''
       uses: actions/setup-node@v4
       with:
         node-version-file: ${{ inputs.node-version-file }}
         cache: pnpm
 
-    - name: Install dependencies
+    - name: Install dependencies (frozen)
+      if: inputs.frozen-lockfile == 'true'
       shell: bash
       run: pnpm install --frozen-lockfile
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+
+    - name: Install dependencies (no frozen)
+      if: inputs.frozen-lockfile != 'true'
+      shell: bash
+      run: pnpm install
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
 
     - name: Build packages (before checks)
       if: inputs.build-first == 'true'
