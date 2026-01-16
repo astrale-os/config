@@ -32,6 +32,9 @@ inputs:
   build-args:
     description: Docker build arguments (KEY=VALUE, one per line)
     default: ''
+  secrets:
+    description: Docker build secrets (id=value, one per line)
+    default: ''
 
 outputs:
   image:
@@ -83,6 +86,7 @@ runs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         build-args: ${{ inputs.build-args }}
+        secrets: ${{ inputs.secrets }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
         provenance: false
