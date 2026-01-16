@@ -17,6 +17,9 @@ inputs:
   token:
     description: npm registry token
     required: true
+  frozen-lockfile:
+    description: Use frozen lockfile (set to false if lockfile may not exist)
+    default: 'true'
 
 runs:
   using: composite
@@ -24,7 +27,8 @@ runs:
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
 
-    - name: Setup Node.js
+    - name: Setup Node.js (with cache)
+      if: inputs.frozen-lockfile == 'true'
       uses: actions/setup-node@v4
       with:
         node-version-file: ${{ inputs.node-version-file }}
@@ -32,9 +36,25 @@ runs:
         registry-url: https://${{ inputs.registry-url }}
         scope: ${{ inputs.scope }}
 
-    - name: Install dependencies
+    - name: Setup Node.js (no cache)
+      if: inputs.frozen-lockfile != 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+        registry-url: https://${{ inputs.registry-url }}
+        scope: ${{ inputs.scope }}
+
+    - name: Install dependencies (frozen)
+      if: inputs.frozen-lockfile == 'true'
       shell: bash
       run: pnpm install --frozen-lockfile
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+
+    - name: Install dependencies (no frozen)
+      if: inputs.frozen-lockfile != 'true'
+      shell: bash
+      run: pnpm install
       env:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
 
