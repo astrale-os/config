@@ -16,7 +16,7 @@ inputs:
     default: ''
   frozen-lockfile:
     description: Use frozen lockfile (set to false if lockfile may not exist)
-    default: 'true'
+    default: 'false'
   build-first:
     description: Build packages before running checks (required for monorepos with inter-package dependencies)
     default: 'true'

@@ -3,3 +3,6 @@ dist
 coverage
 *.log
 .DS_Store
+
+# Lockfile (generated fresh in CI)
+pnpm-lock.yaml
