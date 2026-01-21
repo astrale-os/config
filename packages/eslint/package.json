@@ -28,7 +28,7 @@
     "url": "git+https://github.com/astrale-os/config.git",
     "directory": "packages/eslint"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@eslint/js": "~9.27.0",
     "eslint": "~9.27.0",
     "eslint-config-prettier": "~10.1.0",

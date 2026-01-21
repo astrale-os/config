@@ -22,7 +22,7 @@
     "url": "git+https://github.com/astrale-os/config.git",
     "directory": "packages/prettier"
   },
-  "dependencies": {
+  "peerDependencies": {
     "prettier": "~3.4.2"
   },
   "scripts": {

@@ -24,8 +24,10 @@
     "directory": "packages/commitlint"
   },
   "dependencies": {
-    "@commitlint/cli": "~20.3.1",
     "@commitlint/config-conventional": "~20.3.1"
+  },
+  "peerDependencies": {
+    "@commitlint/cli": "~20.3.1"
   },
   "scripts": {
     "preinstall": "node .check-workspace.cjs"
