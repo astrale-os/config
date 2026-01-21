@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1](https://github.com/astrale-os/config/compare/eslint-config-v2.0.0...eslint-config-v2.0.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* sync jsr.json versions with package.json ([88a549e](https://github.com/astrale-os/config/commit/88a549eeaaf00989a1ed7ded70e85be815735687))
+* update eslint tooling versions for TypeScript 5.8 compatibility ([1b7e784](https://github.com/astrale-os/config/commit/1b7e7846376918c744cf59ca8e3cf0a32ed9aecd))
+
 ## [2.0.0](https://github.com/astrale-os/config/compare/eslint-config-v1.1.0...eslint-config-v2.0.0) (2026-01-21)
 
 

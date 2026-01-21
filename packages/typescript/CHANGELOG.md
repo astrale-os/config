@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/astrale-os/config/compare/typescript-config-v1.1.1...typescript-config-v1.1.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* sync jsr.json versions with package.json ([88a549e](https://github.com/astrale-os/config/commit/88a549eeaaf00989a1ed7ded70e85be815735687))
+
 ## [1.1.1](https://github.com/astrale-os/config/compare/typescript-config-v1.1.0...typescript-config-v1.1.1) (2026-01-21)
 
 
