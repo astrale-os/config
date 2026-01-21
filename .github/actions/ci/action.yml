@@ -90,6 +90,7 @@ runs:
       run: pnpm install --frozen-lockfile
       env:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
+        STANDALONE: 'true'
 
     - name: Install dependencies (no frozen)
       if: inputs.frozen-lockfile != 'true'
@@ -97,6 +98,7 @@ runs:
       run: pnpm install
       env:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
+        STANDALONE: 'true'
 
     - name: Build packages (before checks)
       if: inputs.build-first == 'true'

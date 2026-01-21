@@ -38,11 +38,15 @@ runs:
       if: inputs.frozen-lockfile == 'true'
       shell: bash
       run: pnpm install --frozen-lockfile
+      env:
+        STANDALONE: 'true'
 
     - name: Install dependencies (no frozen)
       if: inputs.frozen-lockfile != 'true'
       shell: bash
       run: pnpm install
+      env:
+        STANDALONE: 'true'
 
     - name: Build packages
       shell: bash
