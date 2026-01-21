@@ -22,8 +22,8 @@
     "url": "git+https://github.com/astrale-os/config.git",
     "directory": "packages/prettier"
   },
-  "peerDependencies": {
-    "prettier": "^3.0.0"
+  "dependencies": {
+    "prettier": "~3.4.2"
   },
   "scripts": {
     "preinstall": "node .check-workspace.cjs"

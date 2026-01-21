@@ -28,18 +28,14 @@
     "url": "git+https://github.com/astrale-os/config.git",
     "directory": "packages/eslint"
   },
-  "peerDependencies": {
-    "@eslint/js": "^9.0.0",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^10.0.0",
-    "typescript-eslint": "^8.0.0"
-  },
-  "devDependencies": {
+  "dependencies": {
     "@eslint/js": "~9.18.0",
-    "@types/node": "~22.0.0",
     "eslint": "~9.18.0",
     "eslint-config-prettier": "~10.0.1",
-    "typescript": "5.8.3",
     "typescript-eslint": "~8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "~22.0.0",
+    "typescript": "5.8.3"
   }
 }
