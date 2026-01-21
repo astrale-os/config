@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.0](https://github.com/astrale-os/config/compare/eslint-config-v1.1.0...eslint-config-v2.0.0) (2026-01-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* Consumers should remove duplicate tool dependencies.
+
+### Features
+
+* bundle tools as direct dependencies instead of peer ([eaec019](https://github.com/astrale-os/config/commit/eaec0192085df4546fefd7371d4f061d69b56ae4))
+
+
+### Bug Fixes
+
+* add js/cjs/mjs to lint-staged config ([fd5802b](https://github.com/astrale-os/config/commit/fd5802b935a91d102403ea421967158224a0b1c1))
+
 ## [1.1.0](https://github.com/astrale-os/config/compare/eslint-config-v1.0.0...eslint-config-v1.1.0) (2026-01-13)
 
 
