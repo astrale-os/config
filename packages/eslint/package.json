@@ -13,7 +13,8 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "preinstall": "node .check-workspace.cjs"
   },
   "keywords": [
     "astrale",
