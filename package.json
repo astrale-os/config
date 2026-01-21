@@ -45,7 +45,7 @@
     "endOfLine": "lf"
   },
   "lint-staged": {
-    "*.{js,ts}": [
+    "*.{js,cjs,mjs,ts}": [
       "eslint --fix",
       "prettier --write"
     ],

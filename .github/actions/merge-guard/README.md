@@ -5,6 +5,7 @@ Enforces merge order across polyrepo workspaces. Blocks PRs if dependency repos 
 ## Why?
 
 In a polyrepo setup, a feature might span multiple repos:
+
 - `kernel` (core types)
 - `shell` (depends on kernel)
 - `gui` (depends on shell)
@@ -39,17 +40,17 @@ jobs:
 
 ## Dependency Map
 
-| Repo | Dependencies |
-|------|--------------|
-| `kernel` | `[]` (none) |
-| `typegraph` | `[]` |
-| `datastore` | `[]` |
-| `adapters` | `["kernel", "typegraph"]` |
-| `shell` | `["kernel"]` |
-| `sdk` | `["kernel", "shell"]` |
-| `gui` | `["kernel", "shell"]` |
-| `backoffice` | `["kernel", "datastore"]` |
-| `cli` | `["kernel", "sdk"]` |
+| Repo           | Dependencies                 |
+| -------------- | ---------------------------- |
+| `kernel`       | `[]` (none)                  |
+| `typegraph`    | `[]`                         |
+| `datastore`    | `[]`                         |
+| `adapters`     | `["kernel", "typegraph"]`    |
+| `shell`        | `["kernel"]`                 |
+| `sdk`          | `["kernel", "shell"]`        |
+| `gui`          | `["kernel", "shell"]`        |
+| `backoffice`   | `["kernel", "datastore"]`    |
+| `cli`          | `["kernel", "sdk"]`          |
 | `distribution` | `["kernel", "shell", "sdk"]` |
 
 ## How It Works
@@ -75,8 +76,8 @@ Merge these PRs first, then re-run this check.
 
 ## Inputs
 
-| Input | Description | Default |
-|-------|-------------|---------|
-| `github-token` | GitHub token (use `${{ github.token }}`) | required |
-| `dependencies` | JSON array of repo names to check | `[]` |
-| `org` | GitHub organization name | `astrale-os` |
+| Input          | Description                              | Default      |
+| -------------- | ---------------------------------------- | ------------ |
+| `github-token` | GitHub token (use `${{ github.token }}`) | required     |
+| `dependencies` | JSON array of repo names to check        | `[]`         |
+| `org`          | GitHub organization name                 | `astrale-os` |

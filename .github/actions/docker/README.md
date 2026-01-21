@@ -5,9 +5,11 @@ Modular Docker actions for building, pushing, and copying images.
 ## Actions
 
 ### `docker/build`
+
 Build Docker image with buildx caching. Does not push.
 
 ### `docker/push-gar`
+
 Build and push to Google Artifact Registry using Workload Identity Federation.
 
 ```yaml
@@ -23,6 +25,7 @@ Build and push to Google Artifact Registry using Workload Identity Federation.
 ```
 
 ### `docker/push-ghcr`
+
 Build and push to GitHub Container Registry.
 
 ```yaml
@@ -34,6 +37,7 @@ Build and push to GitHub Container Registry.
 ```
 
 ### `docker/copy`
+
 Copy image between registries using crane (no rebuild, very fast).
 
 ```yaml
@@ -81,5 +85,6 @@ jobs:
 ## Outputs
 
 Push actions output:
+
 - `image` - Full image path with version tag
 - `digest` - Image digest
