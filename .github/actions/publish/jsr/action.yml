@@ -11,6 +11,9 @@ inputs:
   package:
     description: Package directory to publish (relative to repo root)
     required: true
+  frozen-lockfile:
+    description: Use frozen lockfile (set to false if lockfile may not exist)
+    default: 'false'
 
 runs:
   using: composite
@@ -18,15 +21,28 @@ runs:
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
 
-    - name: Setup Node.js
+    - name: Setup Node.js (with cache)
+      if: inputs.frozen-lockfile == 'true'
       uses: actions/setup-node@v4
       with:
         node-version-file: ${{ inputs.node-version-file }}
         cache: pnpm
 
-    - name: Install dependencies
+    - name: Setup Node.js (no cache)
+      if: inputs.frozen-lockfile != 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+
+    - name: Install dependencies (frozen)
+      if: inputs.frozen-lockfile == 'true'
       shell: bash
       run: pnpm install --frozen-lockfile
+
+    - name: Install dependencies (no frozen)
+      if: inputs.frozen-lockfile != 'true'
+      shell: bash
+      run: pnpm install
 
     - name: Build packages
       shell: bash
