@@ -24,5 +24,8 @@
   },
   "peerDependencies": {
     "prettier": "^3.0.0"
+  },
+  "scripts": {
+    "preinstall": "node .check-workspace.cjs"
   }
 }
