@@ -23,7 +23,7 @@
     "directory": "packages/prettier"
   },
   "peerDependencies": {
-    "prettier": "~3.4.2"
+    "prettier": "~3.8.0"
   },
   "scripts": {
     "preinstall": "node .check-workspace.cjs"
