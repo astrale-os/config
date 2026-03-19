@@ -16,9 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/ci
-        with:
-          run-test: 'false'
-          run-typecheck: 'false'
 
   commitlint:
     runs-on: ubuntu-latest
