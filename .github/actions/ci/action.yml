@@ -21,7 +21,7 @@ inputs:
     description: Build packages before running checks (required for monorepos with inter-package dependencies)
     default: 'true'
   run-lint:
-    description: Run ESLint and Prettier checks
+    description: Run oxlint and Prettier checks
     default: 'true'
   run-typecheck:
     description: Run TypeScript type checking
@@ -105,7 +105,7 @@ runs:
       shell: bash
       run: ${{ inputs.build-command }}
 
-    - name: Run ESLint
+    - name: Run oxlint
       if: inputs.run-lint == 'true'
       shell: bash
       run: ${{ inputs.lint-command }}

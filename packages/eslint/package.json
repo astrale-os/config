@@ -1,7 +1,7 @@
 {
   "name": "@astrale-os/eslint-config",
   "version": "2.0.1",
-  "description": "Shared ESLint configuration for Astrale OS projects",
+  "description": "@deprecated - Use oxlint with oxlint.json instead. Shared ESLint configuration for Astrale OS projects",
   "type": "module",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",

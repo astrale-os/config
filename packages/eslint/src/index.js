@@ -3,6 +3,9 @@ import tseslint from 'typescript-eslint'
 import eslintConfigPrettier from 'eslint-config-prettier'
 
 /**
+ * @deprecated This package is deprecated. Use oxlint with oxlint.json instead.
+ * See the root oxlint.json for the shared configuration.
+ *
  * Creates a base ESLint configuration for Astrale OS TypeScript projects.
  *
  * @param {Object} [options] - Configuration options
