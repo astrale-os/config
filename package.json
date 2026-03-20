@@ -24,15 +24,11 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@eslint/js": "~9.39.2",
-    "eslint": "~9.39.2",
-    "eslint-config-prettier": "~10.1.8",
     "oxlint": "latest",
     "husky": "~9.1.7",
     "lint-staged": "~16.2.7",
     "prettier": "~3.8.0",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "~8.53.1"
+    "typescript": "~5.9.3"
   },
   "prettier": {
     "semi": false,
