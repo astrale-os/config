@@ -1,32 +1,34 @@
 {
-  "name": "@astrale-os/prettier-config",
-  "version": "2.0.1",
-  "description": "Shared Prettier configuration for Astrale OS projects",
+  "name": "@astrale-os/ox",
+  "version": "0.1.0",
+  "description": "Shared oxlint and oxfmt configuration for Astrale OS projects",
   "keywords": [
     "astrale",
     "config",
-    "prettier"
+    "oxfmt",
+    "oxlint"
   ],
   "license": "MIT",
   "author": "Astrale",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/astrale-os/config.git",
-    "directory": "packages/prettier"
+    "directory": "packages/ox"
   },
   "files": [
-    "src"
+    "lint.ts",
+    "fmt.ts"
   ],
   "type": "module",
-  "main": "./src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    "./lint": "./lint.ts",
+    "./fmt": "./fmt.ts"
   },
   "scripts": {
     "preinstall": "node .check-workspace.cjs"
   },
   "peerDependencies": {
-    "prettier": "~3.8.0"
-  },
-  "deprecated": "Use oxfmt with .oxfmtrc.json instead"
+    "oxfmt": ">=0.1.0",
+    "oxlint": ">=1.0.0"
+  }
 }

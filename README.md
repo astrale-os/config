@@ -4,36 +4,22 @@ Shared configurations and composite actions for Astrale TypeScript monorepos.
 
 ## Packages
 
-| Package                      | JSR                                                                                                   | Description                       |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `@astrale/eslint-config`     | [![JSR](https://jsr.io/badges/@astrale/eslint-config)](https://jsr.io/@astrale/eslint-config)         | ESLint flat config for TypeScript |
-| `@astrale/typescript-config` | [![JSR](https://jsr.io/badges/@astrale/typescript-config)](https://jsr.io/@astrale/typescript-config) | Base tsconfig presets             |
-| `@astrale/prettier-config`   | [![JSR](https://jsr.io/badges/@astrale/prettier-config)](https://jsr.io/@astrale/prettier-config)     | Prettier formatting rules         |
-| `@astrale/commitlint-config` | [![JSR](https://jsr.io/badges/@astrale/commitlint-config)](https://jsr.io/@astrale/commitlint-config) | Conventional commits config       |
-| `@astrale/renovate-config`   | —                                                                                                     | Renovate dependency updates       |
+| Package                      | JSR                                                                                                   | Description                 |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------- |
+| `@astrale-os/ox`             | —                                                                                                     | oxlint + oxfmt CLI wrapper  |
+| `@astrale/typescript-config` | [![JSR](https://jsr.io/badges/@astrale/typescript-config)](https://jsr.io/@astrale/typescript-config) | Base tsconfig presets       |
+| `@astrale/commitlint-config` | [![JSR](https://jsr.io/badges/@astrale/commitlint-config)](https://jsr.io/@astrale/commitlint-config) | Conventional commits config |
+| `@astrale/renovate-config`   | —                                                                                                     | Renovate dependency updates |
 
 ## Installation
 
 Requires **pnpm 10.9+** for native JSR support.
 
 ```bash
-pnpm add -D jsr:@astrale/eslint-config jsr:@astrale/typescript-config jsr:@astrale/prettier-config jsr:@astrale/commitlint-config
+pnpm add -D jsr:@astrale/typescript-config jsr:@astrale/commitlint-config
 ```
 
 ## Config Usage
-
-### ESLint
-
-```js
-// eslint.config.js
-import { createConfig } from '@astrale/eslint-config'
-
-export default createConfig({
-  tsconfigRootDir: import.meta.dirname,
-  testPatterns: ['**/*.test.ts'],
-  ignorePatterns: ['some/file.ts'],
-})
-```
 
 ### TypeScript
 
@@ -48,12 +34,6 @@ export default createConfig({
 ```
 
 Presets: `/base`, `/library`, `/app`
-
-### Prettier
-
-```json
-{ "prettier": "@astrale/prettier-config" }
-```
 
 ### Commitlint
 
