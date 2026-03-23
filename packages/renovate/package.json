@@ -2,20 +2,13 @@
   "name": "@astrale-os/renovate-config",
   "version": "1.1.1",
   "description": "Shared Renovate configuration for Astrale OS projects",
-  "renovate-config": {
-    "default": {
-      "extends": [
-        "local>astrale-os/config:packages/renovate/default"
-      ]
-    }
-  },
   "keywords": [
     "astrale",
-    "renovate",
-    "config"
+    "config",
+    "renovate"
   ],
-  "author": "Astrale",
   "license": "MIT",
+  "author": "Astrale",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/astrale-os/config.git",
@@ -23,5 +16,12 @@
   },
   "scripts": {
     "preinstall": "node .check-workspace.cjs"
+  },
+  "renovate-config": {
+    "default": {
+      "extends": [
+        "local>astrale-os/config:packages/renovate/default"
+      ]
+    }
   }
 }
