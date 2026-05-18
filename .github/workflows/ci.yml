@@ -16,6 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/ci
+        with:
+          frozen-lockfile: 'true'
 
   commitlint:
     runs-on: ubuntu-latest
@@ -23,6 +25,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+        with:
+          frozen-lockfile: 'true'
       - name: Validate PR title
         run: echo "${{ github.event.pull_request.title }}" | pnpm commitlint
 

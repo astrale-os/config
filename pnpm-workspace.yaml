@@ -1,2 +1,19 @@
 packages:
   - 'packages/*'
+
+# Block packages released < 7 days ago (10080 minutes) — supply-chain hardening.
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - '@astrale-os/*'
+  - '@astrale/*'
+
+# Allowlist of packages permitted to run install scripts (supply-chain hardening).
+onlyBuiltDependencies:
+  - better-sqlite3
+  - cbor-extract
+  - esbuild
+  - lightningcss
+  - msgpackr-extract
+  - protobufjs
+  - sharp
+  - workerd
