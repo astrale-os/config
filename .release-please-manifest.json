@@ -1,7 +1,6 @@
 {
-  "packages/eslint": "2.0.1",
   "packages/typescript": "1.1.2",
-  "packages/prettier": "2.0.1",
   "packages/commitlint": "2.0.1",
+  "packages/ox": "0.1.0",
   "packages/renovate": "1.1.1"
 }

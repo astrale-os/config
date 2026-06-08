@@ -17,7 +17,8 @@
   },
   "files": [
     "lint.ts",
-    "fmt.ts"
+    "fmt.ts",
+    ".check-workspace.cjs"
   ],
   "type": "module",
   "exports": {
