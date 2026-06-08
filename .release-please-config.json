@@ -8,9 +8,7 @@
     "packages/commitlint": {
       "extra-files": ["jsr.json"]
     },
-    "packages/ox": {
-      "extra-files": ["jsr.json"]
-    },
+    "packages/ox": {},
     "packages/renovate": {}
   },
   "changelog-sections": [

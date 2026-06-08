@@ -25,9 +25,6 @@
     "./lint": "./lint.ts",
     "./fmt": "./fmt.ts"
   },
-  "scripts": {
-    "preinstall": "node .check-workspace.cjs"
-  },
   "peerDependencies": {
     "oxfmt": ">=0.1.0",
     "oxlint": ">=1.0.0"
