@@ -1,0 +1,9 @@
+{
+  "name": "@astrale/ox",
+  "version": "0.1.0",
+  "license": "MIT",
+  "exports": {
+    "./lint": "./lint.ts",
+    "./fmt": "./fmt.ts"
+  }
+}
