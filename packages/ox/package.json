@@ -1,6 +1,6 @@
 {
   "name": "@astrale-os/ox",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shared oxlint and oxfmt configuration for Astrale OS projects",
   "keywords": [
     "astrale",
@@ -16,14 +16,13 @@
     "directory": "packages/ox"
   },
   "files": [
-    "lint.ts",
-    "fmt.ts",
-    ".check-workspace.cjs"
+    "lint.js",
+    "fmt.js"
   ],
   "type": "module",
   "exports": {
-    "./lint": "./lint.ts",
-    "./fmt": "./fmt.ts"
+    "./lint": "./lint.js",
+    "./fmt": "./fmt.js"
   },
   "peerDependencies": {
     "oxfmt": ">=0.1.0",

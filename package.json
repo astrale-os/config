@@ -29,8 +29,11 @@
     "typescript": "~6.0.1-rc"
   },
   "lint-staged": {
-    "*.{js,cjs,mjs,ts}": [
+    "*.ts": [
       "oxlint --fix",
+      "oxfmt --write"
+    ],
+    "*.{js,cjs,mjs}": [
       "oxfmt --write"
     ],
     "*.{json,yml,yaml}": [
