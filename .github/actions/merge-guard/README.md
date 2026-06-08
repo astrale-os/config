@@ -49,7 +49,6 @@ jobs:
 | `shell`        | `["kernel"]`                 |
 | `sdk`          | `["kernel", "shell"]`        |
 | `gui`          | `["kernel", "shell"]`        |
-| `backoffice`   | `["kernel", "datastore"]`    |
 | `cli`          | `["kernel", "sdk"]`          |
 | `distribution` | `["kernel", "shell", "sdk"]` |
 
