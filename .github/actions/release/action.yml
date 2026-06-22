@@ -1,5 +1,5 @@
 name: Release
-description: Run Release Please for automated versioning
+description: Run Release Please for automated versioning, then format the release PR's version bumps with the shared oxfmt config so they don't break format:check.
 
 inputs:
   token:
@@ -11,6 +11,26 @@ inputs:
   manifest-file:
     description: Path to release-please manifest file
     default: '.release-please-manifest.json'
+  format-release-pr:
+    description: >-
+      Re-format the release PR's version bumps with the repo's oxfmt config so
+      the merged release commit keeps format:check green on main.
+    default: 'true'
+  format-command:
+    description: Command that formats the repo with the shared @astrale-os/ox oxfmt config.
+    default: 'pnpm format'
+  node-version-file:
+    description: Path to .nvmrc (toolchain for the format step).
+    default: '.nvmrc'
+  registry-url:
+    description: Optional npm registry URL for installing deps before formatting.
+    default: ''
+  scope:
+    description: Optional registry scope (e.g. @astrale-os).
+    default: ''
+  frozen-lockfile:
+    description: Frozen lockfile when installing before formatting (false tolerates release-please version bumps).
+    default: 'false'
 
 outputs:
   releases_created:
@@ -30,3 +50,63 @@ runs:
         token: ${{ inputs.token }}
         config-file: ${{ inputs.config-file }}
         manifest-file: ${{ inputs.manifest-file }}
+
+    # release-please writes version bumps into package.json with its own JSON
+    # style, which doesn't match the shared oxfmt config — so the merged release
+    # commit would otherwise red-line `format:check` on main (and every branch
+    # cut from it). Re-format the release PR in place with the repo's
+    # `pnpm format` (oxfmt.config.ts -> @astrale-os/ox/fmt) so the bumps land
+    # already formatted. Best-effort + guarded: skips cleanly when there is no
+    # release PR or the repo has no `format` script.
+    - name: Resolve release PR branch
+      id: release-pr
+      if: ${{ inputs.format-release-pr == 'true' && steps.release.outputs.prs_created == 'true' }}
+      shell: bash
+      env:
+        RP_PR: ${{ steps.release.outputs.pr }}
+      run: |
+        set -euo pipefail
+        if [ -z "${RP_PR:-}" ]; then
+          echo "::warning::release-please reported a PR but no 'pr' output; skipping format."
+          exit 0
+        fi
+        branch="$(printf '%s' "$RP_PR" | jq -r '.headBranchName // empty')"
+        if [ -z "$branch" ]; then
+          echo "::warning::Could not read the release PR branch; skipping format."
+          exit 0
+        fi
+        git fetch origin "$branch"
+        git checkout "$branch"
+        if ! node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts.format ? 0 : 1)" 2>/dev/null; then
+          echo "::warning::No \"format\" script in package.json; skipping release-PR format."
+          exit 0
+        fi
+        echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+    - name: Setup toolchain + install
+      if: ${{ steps.release-pr.outputs.branch != '' }}
+      uses: astrale-os/config/.github/actions/setup@main
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+        registry-url: ${{ inputs.registry-url }}
+        scope: ${{ inputs.scope }}
+        token: ${{ inputs.token }}
+        frozen-lockfile: ${{ inputs.frozen-lockfile }}
+
+    - name: Format release bumps with shared oxfmt config and push
+      if: ${{ steps.release-pr.outputs.branch != '' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Drop any incidental lockfile churn from the non-frozen install so the
+        # commit carries only formatting.
+        git checkout -- pnpm-lock.yaml 2>/dev/null || true
+        ${{ inputs.format-command }}
+        if git diff --quiet; then
+          echo "Release PR already correctly formatted; nothing to push."
+          exit 0
+        fi
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git commit -am "style: format release version bumps (oxfmt, shared @astrale-os/ox config)"
+        git push origin "${{ steps.release-pr.outputs.branch }}"
