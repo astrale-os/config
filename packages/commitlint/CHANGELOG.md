@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/astrale-os/config/compare/commitlint-config-v2.0.1...commitlint-config-v2.0.2) (2026-06-22)
+
+
+### Bug Fixes
+
+* make commit scope and subject-case advisory, not blocking ([189bc15](https://github.com/astrale-os/config/commit/189bc15ab1101c45dd94f9436c237ea9c063f398))
+
 ## [2.0.1](https://github.com/astrale-os/config/compare/commitlint-config-v2.0.0...commitlint-config-v2.0.1) (2026-01-21)
 
 
