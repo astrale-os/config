@@ -120,7 +120,11 @@ else
     [ "$gh" = "true" ] || { echo "GH: skip $name (not a GitHub Packages target)"; continue; }
     exists_on "$spec" "$GH_REG" "$GH_NEUTRAL"; e=$?
     [ "$e" = "0" ] && { echo "GH: skip $spec (already published)"; continue; }
-    [ "$e" = "2" ] && { gh_rc=1; continue; }   # unknown skip-check error -> do not blind-publish
+    # Inconclusive skip-check (e.g. a 403 because a pre-existing copy is linked to
+    # another repo, or a transient error): GitHub Packages is a best-effort mirror
+    # of packages also on npm, so warn + skip this one rather than failing the run.
+    # We never blind-publish on an inconclusive check.
+    [ "$e" = "2" ] && { echo "::warning title=GitHub Packages skip::inconclusive skip-check for $spec — skipping its GitHub Packages publish (npm is unaffected)"; continue; }
     if [ "$DRY_RUN" = "1" ]; then echo "GH: WOULD PUBLISH $spec"; continue; fi
     tarball=$(pack_tarball "$dir") || { echo "::error::pack failed for $spec"; gh_rc=1; continue; }
     out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$GH_NEUTRAL" npm publish "$tarball" --access=restricted --registry="$GH_REG" 2>&1 ); pub=$?
