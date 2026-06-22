@@ -131,6 +131,11 @@ else
     if [ "$pub" = "0" ]; then echo "GH: published $spec"; gh_published="$gh_published $spec"
     elif printf '%s' "$out" | grep -qiE 'already exists|cannot publish over|EPUBLISHCONFLICT|409 Conflict'; then
       echo "GH: $spec already exists (idempotent skip)"
+    elif printf '%s' "$out" | grep -qiE 'E403|403 Forbidden|permission_denied|do not have permission|not have permission'; then
+      # No permission to publish to GitHub Packages (a pre-existing copy is linked
+      # to another repo). GitHub Packages is a best-effort mirror — warn + skip
+      # rather than fail; npm is the source of truth for these public packages.
+      echo "::warning title=GitHub Packages skip::no permission to publish $spec (copy linked to another repo) — skipping (npm unaffected)"
     else echo "::error::GitHub Packages publish failed for $spec"; printf '%s\n' "$out"; gh_rc=1; fi
   done
 fi
