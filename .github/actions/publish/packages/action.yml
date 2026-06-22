@@ -1,0 +1,72 @@
+name: Publish packages (GitHub Packages + npm)
+description: >
+  Build and publish a repo's packages to GitHub Packages (all @astrale-os/* scoped)
+  and npm (public packages only), idempotently. Never publishes a private package
+  to npm. GitHub Packages uses the repo's own GITHUB_TOKEN; npm uses OIDC Trusted
+  Publishing (no token) unless npm-token is supplied. See docs/release.md.
+
+inputs:
+  dirs:
+    description: Space-separated package directories to consider (relative to repo root).
+    required: true
+  github-token:
+    description: Token with packages:write (typically secrets.GITHUB_TOKEN).
+    required: true
+  npm-token:
+    description: Optional npm token. If empty, npm publishes via OIDC Trusted Publishing.
+    default: ''
+  node-version-file:
+    default: '.nvmrc'
+  pnpm-version:
+    default: '10.28.0'
+  build-command:
+    description: Command that builds the publish set (and its workspace deps).
+    default: 'pnpm -r run build'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: ${{ inputs.pnpm-version }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+
+    - name: Upgrade npm (OIDC Trusted Publishing needs npm >= 11.5.1)
+      shell: bash
+      run: |
+        set -eu
+        npm install -g npm@latest
+        npm --version
+
+    - name: Configure registries
+      shell: bash
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -eu
+        {
+          printf '%s\n' '@jsr:registry=https://npm.jsr.io'
+          printf '%s\n' '@astrale-os:registry=https://npm.pkg.github.com'
+          printf '%s\n' "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}"
+        } >> "$HOME/.npmrc"
+
+    - name: Install dependencies
+      shell: bash
+      run: STANDALONE=true pnpm install --no-frozen-lockfile
+
+    - name: Build
+      shell: bash
+      run: ${{ inputs.build-command }}
+
+    - name: Publish
+      shell: bash
+      env:
+        PUBLISH_DIRS: ${{ inputs.dirs }}
+        GH_PACKAGES_TOKEN: ${{ inputs.github-token }}
+        NPM_TOKEN: ${{ inputs.npm-token }}
+      run: bash "${{ github.action_path }}/publish.sh"
