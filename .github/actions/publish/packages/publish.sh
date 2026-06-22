@@ -108,16 +108,22 @@ if [ -z "$GH_PACKAGES_TOKEN" ]; then
   echo "::warning title=GitHub Packages publish skipped::no packages token (GITHUB_TOKEN) available"
   summary "## ⚠️ GitHub Packages publish skipped — no token"
 else
+  # Isolated config so GH operations always hit GitHub Packages, regardless of how
+  # the repo's own .npmrc routes the @astrale-os scope (sdk/shell route it to npm
+  # for install, since their deps are public there — see docs/release.md).
+  GH_NEUTRAL="$RUNNER_TEMP/ghpkg.npmrc"; : > "$GH_NEUTRAL"
+  printf '@astrale-os:registry=%s\n' "$GH_REG" >> "$GH_NEUTRAL"
+  printf '//npm.pkg.github.com/:_authToken=%s\n' "$GH_PACKAGES_TOKEN" >> "$GH_NEUTRAL"
   for dir in $PUBLISH_DIRS; do
     read -r gh _ < <(decide "$dir")
     name=$(field "$dir" name); version=$(field "$dir" version); spec="$name@$version"
     [ "$gh" = "true" ] || { echo "GH: skip $name (not a GitHub Packages target)"; continue; }
-    exists_on "$spec" "$GH_REG"; e=$?
+    exists_on "$spec" "$GH_REG" "$GH_NEUTRAL"; e=$?
     [ "$e" = "0" ] && { echo "GH: skip $spec (already published)"; continue; }
     [ "$e" = "2" ] && { gh_rc=1; continue; }   # unknown skip-check error -> do not blind-publish
     if [ "$DRY_RUN" = "1" ]; then echo "GH: WOULD PUBLISH $spec"; continue; fi
     tarball=$(pack_tarball "$dir") || { echo "::error::pack failed for $spec"; gh_rc=1; continue; }
-    out=$(npm publish "$tarball" --access=restricted --registry="$GH_REG" 2>&1); pub=$?
+    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$GH_NEUTRAL" npm publish "$tarball" --access=restricted --registry="$GH_REG" 2>&1 ); pub=$?
     if [ "$pub" = "0" ]; then echo "GH: published $spec"; gh_published="$gh_published $spec"
     elif printf '%s' "$out" | grep -qiE 'already exists|cannot publish over|EPUBLISHCONFLICT|409 Conflict'; then
       echo "GH: $spec already exists (idempotent skip)"

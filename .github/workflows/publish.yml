@@ -35,41 +35,10 @@ jobs:
 
   publish-ox:
     runs-on: ubuntu-latest
-    env:
-      NODE_AUTH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/publish/packages
         with:
-          node-version-file: '.nvmrc'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@astrale-os'
-      - name: Install dependencies
-        run: STANDALONE=true pnpm install --no-frozen-lockfile
-      - name: Validate ox package
-        run: |
-          set -eu
-          pack_dir="$RUNNER_TEMP/ox-pack"
-          mkdir -p "$pack_dir"
-          pnpm --dir packages/ox pack --pack-destination "$pack_dir"
-          tarball="$(find "$pack_dir" -maxdepth 1 -name '*.tgz' -print -quit)"
-          tar -tzf "$tarball" | grep -q '^package/fmt.js$'
-          tar -tzf "$tarball" | grep -q '^package/lint.js$'
-      - name: Publish ox to GitHub Packages
-        run: |
-          set -eu
-          name="$(node -p "require('./packages/ox/package.json').name")"
-          version="$(node -p "require('./packages/ox/package.json').version")"
-          spec="$name@$version"
-
-          if npm view "$spec" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
-            echo "skip $spec (already published)"
-            exit 0
-          fi
-
-          pack_dir="$RUNNER_TEMP/ox-publish"
-          mkdir -p "$pack_dir"
-          pnpm --dir packages/ox pack --pack-destination "$pack_dir"
-          tarball="$(find "$pack_dir" -maxdepth 1 -name '*.tgz' -print -quit)"
-          npm publish "$tarball" --access=public --registry=https://npm.pkg.github.com
+          dirs: 'packages/ox'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          build-command: 'echo "ox ships prebuilt js — no build step"'
