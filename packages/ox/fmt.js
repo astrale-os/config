@@ -10,7 +10,10 @@ export default defineConfig({
   bracketSpacing: true,
   arrowParens: 'always',
   endOfLine: 'lf',
-  ignorePatterns: ['*.min.js', '*.min.css', '*.tsbuildinfo', '**/*.md'],
+  // Generated files (e.g. TanStack Router `routeTree.gen.ts`) are owned by their
+  // generator — formatting them re-sorts imports and creates an endless diff
+  // ping-pong against each regen. The files themselves ask to be excluded.
+  ignorePatterns: ['*.min.js', '*.min.css', '*.tsbuildinfo', '**/*.md', '**/*.gen.ts'],
   sortImports: {
     groups: [
       'type-import',
