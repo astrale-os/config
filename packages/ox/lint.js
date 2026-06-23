@@ -23,6 +23,7 @@ export default defineConfig({
     '**/*.mjs',
     '**/*.cjs',
     '**/*.gen.ts', // generator-owned (TanStack routeTree.gen.ts etc.) — already `/* eslint-disable */`
+    '**/*.gen.tsx',
   ],
   overrides: [
     {
