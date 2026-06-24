@@ -22,6 +22,12 @@ inputs:
   build-command:
     description: Command that builds the publish set (and its workspace deps).
     default: 'pnpm -r run build'
+  prerelease-tag:
+    description: >
+      npm dist-tag for prerelease versions (e.g. -alpha.N). 'auto' (default) derives
+      the channel tag from the identifier (alpha/beta/rc). Set to 'latest' to make
+      every prerelease the default install (bare `npm i`). Releases always use latest.
+    default: 'auto'
 
 runs:
   using: composite
@@ -69,4 +75,5 @@ runs:
         PUBLISH_DIRS: ${{ inputs.dirs }}
         GH_PACKAGES_TOKEN: ${{ inputs.github-token }}
         NPM_TOKEN: ${{ inputs.npm-token }}
+        PRERELEASE_TAG: ${{ inputs.prerelease-tag }}
       run: bash "${{ github.action_path }}/publish.sh"

@@ -102,6 +102,23 @@ pack_tarball() {
   printf '%s' "$tb"
 }
 
+# npm dist-tag for a version. npm (>=11) REFUSES to publish a prerelease without an
+# explicit --tag — it won't silently put a prerelease on `latest`. A release -> latest.
+# For a prerelease: PRERELEASE_TAG overrides (e.g. 'latest' to make every prerelease
+# the default install); 'auto'/unset derives the channel tag from the identifier
+# (0.4.0-alpha.13 -> alpha, 1.0.0-rc.2 -> rc).
+npm_tag_for() {
+  case "$1" in
+    *-*)
+      if [ -n "${PRERELEASE_TAG:-}" ] && [ "${PRERELEASE_TAG}" != "auto" ]; then
+        printf '%s' "$PRERELEASE_TAG"
+      else
+        local pre="${1#*-}"; printf '%s' "${pre%%.*}"
+      fi ;;
+    *) printf 'latest' ;;
+  esac
+}
+
 # ─── GitHub Packages ─────────────────────────────────────────────────────────
 gh_rc=0; gh_published=""
 if [ -z "$GH_PACKAGES_TOKEN" ]; then
@@ -127,7 +144,7 @@ else
     [ "$e" = "2" ] && { echo "::warning title=GitHub Packages skip::inconclusive skip-check for $spec — skipping its GitHub Packages publish (npm is unaffected)"; continue; }
     if [ "$DRY_RUN" = "1" ]; then echo "GH: WOULD PUBLISH $spec"; continue; fi
     tarball=$(pack_tarball "$dir") || { echo "::error::pack failed for $spec"; gh_rc=1; continue; }
-    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$GH_NEUTRAL" npm publish "$tarball" --access=restricted --registry="$GH_REG" 2>&1 ); pub=$?
+    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$GH_NEUTRAL" npm publish "$tarball" --access=restricted --tag "$(npm_tag_for "$version")" --registry="$GH_REG" 2>&1 ); pub=$?
     if [ "$pub" = "0" ]; then echo "GH: published $spec"; gh_published="$gh_published $spec"
     elif printf '%s' "$out" | grep -qiE 'already exists|cannot publish over|EPUBLISHCONFLICT|409 Conflict'; then
       echo "GH: $spec already exists (idempotent skip)"
@@ -164,10 +181,10 @@ if [ -z "$pending" ]; then
   echo "npm: nothing new to publish"
 else
   for item in $pending; do
-    dir="${item%%|*}"; spec="${item#*|}"
-    if [ "$DRY_RUN" = "1" ]; then echo "npm: WOULD PUBLISH $spec"; continue; fi
+    dir="${item%%|*}"; spec="${item#*|}"; tag=$(npm_tag_for "${spec##*@}")
+    if [ "$DRY_RUN" = "1" ]; then echo "npm: WOULD PUBLISH $spec (tag $tag)"; continue; fi
     tarball=$(pack_tarball "$dir") || { echo "::error::pack failed for $spec"; npm_rc=1; continue; }
-    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$NEUTRAL" npm publish "$tarball" --access public --registry="$NPM_REG" 2>&1 ); pub=$?
+    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$NEUTRAL" npm publish "$tarball" --access public --tag "$tag" --registry="$NPM_REG" 2>&1 ); pub=$?
     if [ "$pub" = "0" ]; then echo "npm: published $spec"
     elif printf '%s' "$out" | grep -qiE 'cannot publish over|already exists|EPUBLISHCONFLICT|previously published'; then
       echo "npm: $spec already exists (idempotent skip)"
