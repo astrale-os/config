@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/astrale-os/config/compare/ox-v0.1.2...ox-v0.1.3) (2026-07-08)
+
+
+### Bug Fixes
+
+* **ox:** exclude generated *.gen.ts/*.gen.tsx from oxfmt + oxlint ([c8b00e7](https://github.com/astrale-os/config/commit/c8b00e701cee45ae8123527faab523dc6bba4b15))
+
 ## [0.1.2](https://github.com/astrale-os/config/compare/ox-v0.1.1...ox-v0.1.2) (2026-06-22)
 
 

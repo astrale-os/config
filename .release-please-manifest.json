@@ -1,6 +1,6 @@
 {
   "packages/typescript": "1.1.2",
   "packages/commitlint": "2.0.2",
-  "packages/ox": "0.1.2",
+  "packages/ox": "0.1.3",
   "packages/renovate": "1.1.1"
 }
