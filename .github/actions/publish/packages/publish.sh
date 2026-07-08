@@ -46,6 +46,7 @@ NPM_TOKEN="${NPM_TOKEN:-}"
 
 summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"; return 0; }
 field() { node -p "(require('./$1/package.json').$2)" 2>/dev/null; }
+compact() { printf '%s' "$1" | tr '\n' ' ' | cut -c1-500; }
 
 # Echoes "<gh> <npm>" booleans (true/false) for a package dir.
 decide() {
@@ -189,7 +190,9 @@ else
     elif printf '%s' "$out" | grep -qiE 'cannot publish over|already exists|EPUBLISHCONFLICT|previously published'; then
       echo "npm: $spec already exists (idempotent skip)"
     elif printf '%s' "$out" | grep -qiE 'E401|EOTP|ENEEDAUTH|one-time pass|two-factor|Unable to authenticate|must be logged in|Unauthorized|EOIDC|oidc|id-token|trusted publish'; then
-      echo "::warning::npm auth/OIDC blocked publishing $spec"; auth_failed=1
+      echo "::warning::npm auth/OIDC blocked publishing $spec: $(compact "$out")"
+      printf '%s\n' "$out" >&2
+      auth_failed=1
     else echo "::error::npm publish failed for $spec"; printf '%s\n' "$out"; npm_rc=1; fi
   done
   if [ "$auth_failed" = "1" ]; then
