@@ -190,7 +190,7 @@ else
     elif printf '%s' "$out" | grep -qiE 'cannot publish over|already exists|EPUBLISHCONFLICT|previously published'; then
       echo "npm: $spec already exists (idempotent skip)"
     elif printf '%s' "$out" | grep -qiE 'E401|EOTP|ENEEDAUTH|one-time pass|two-factor|Unable to authenticate|must be logged in|Unauthorized|EOIDC|oidc|id-token|trusted publish'; then
-      echo "::warning::npm auth/OIDC blocked publishing $spec: $(compact "$out")"
+      echo "::error::npm auth/OIDC blocked publishing $spec: $(compact "$out")"
       printf '%s\n' "$out" >&2
       auth_failed=1
     else echo "::error::npm publish failed for $spec"; printf '%s\n' "$out"; npm_rc=1; fi
@@ -201,7 +201,7 @@ else
     summary "Most likely a package is missing its **Trusted Publisher** on npmjs — it must"
     summary "trust this repo + workflow (see docs/release.md). Configure it, or set an"
     summary "\`NPM_TOKEN\` secret, then re-run."
-    echo "::warning title=npm auth failed::OIDC/token rejected — configure Trusted Publishing (see docs/release.md)"
+    echo "::error title=npm auth failed::OIDC/token rejected — configure Trusted Publishing (see docs/release.md)"
   fi
 fi
 
@@ -210,5 +210,9 @@ fi
 rc=0
 [ "$gh_rc" != "0" ] && rc=1
 [ "$npm_rc" != "0" ] && rc=1
+# An auth-blocked npm publish means a release did NOT ship — that must fail the
+# run, not hide behind a green check (a silently-unpublished create-astrale-domain
+# release was missed exactly this way). The summary above says how to fix auth.
+[ "$auth_failed" = "1" ] && rc=1
 echo "=== publish done (gh_rc=$gh_rc npm_rc=$npm_rc) ==="
 exit $rc
