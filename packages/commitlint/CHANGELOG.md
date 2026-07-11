@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/astrale-os/config/compare/commitlint-config-v2.0.2...commitlint-config-v2.0.3) (2026-07-11)
+
+
+### Bug Fixes
+
+* **preinstall:** tolerate missing .check-workspace.cjs in published tarballs ([#11](https://github.com/astrale-os/config/issues/11)) ([a71fe93](https://github.com/astrale-os/config/commit/a71fe93dfacb7d0ebfa4c842b628f7afbae4c511))
+
 ## [2.0.2](https://github.com/astrale-os/config/compare/commitlint-config-v2.0.1...commitlint-config-v2.0.2) (2026-06-22)
 
 
