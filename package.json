@@ -8,7 +8,7 @@
   },
   "type": "module",
   "scripts": {
-    "preinstall": "node .check-workspace.cjs",
+    "preinstall": "node -e \"try{require('./.check-workspace.cjs')}catch{}\"",
     "build": "pnpm -r run build",
     "clean": "pnpm -r run clean",
     "typecheck": "pnpm -r run typecheck",

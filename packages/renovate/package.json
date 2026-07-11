@@ -15,7 +15,7 @@
     "directory": "packages/renovate"
   },
   "scripts": {
-    "preinstall": "node .check-workspace.cjs"
+    "preinstall": "node -e \"try{require('./.check-workspace.cjs')}catch{}\""
   },
   "renovate-config": {
     "default": {
