@@ -24,7 +24,7 @@
     ".": "./src/index.js"
   },
   "scripts": {
-    "preinstall": "node .check-workspace.cjs"
+    "preinstall": "node -e \"try{require('./.check-workspace.cjs')}catch{}\""
   },
   "dependencies": {
     "@commitlint/config-conventional": "~20.3.1"
