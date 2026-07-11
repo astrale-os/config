@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/astrale-os/config/compare/renovate-config-v1.1.1...renovate-config-v1.1.2) (2026-07-11)
+
+
+### Bug Fixes
+
+* **preinstall:** tolerate missing .check-workspace.cjs in published tarballs ([#11](https://github.com/astrale-os/config/issues/11)) ([a71fe93](https://github.com/astrale-os/config/commit/a71fe93dfacb7d0ebfa4c842b628f7afbae4c511))
+
 ## [1.1.1](https://github.com/astrale-os/config/compare/renovate-config-v1.1.0...renovate-config-v1.1.1) (2026-01-21)
 
 
