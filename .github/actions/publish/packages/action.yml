@@ -22,6 +22,9 @@ inputs:
   build-command:
     description: Command that builds the publish set (and its workspace deps).
     default: 'pnpm -r run build'
+  install-command:
+    description: Command that installs the publish set (and its workspace dependencies).
+    default: 'STANDALONE=true pnpm install --no-frozen-lockfile'
   prerelease-tag:
     description: >
       npm dist-tag for prerelease versions (e.g. -alpha.N). 'auto' (default) derives
@@ -66,7 +69,7 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: STANDALONE=true pnpm install --no-frozen-lockfile
+      run: ${{ inputs.install-command }}
 
     - name: Build
       shell: bash
