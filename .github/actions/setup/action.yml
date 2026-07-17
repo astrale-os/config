@@ -2,6 +2,9 @@ name: Setup
 description: Setup pnpm, Node.js, and install dependencies
 
 inputs:
+  node-version:
+    description: Optional Node.js version or range; overrides node-version-file when set
+    default: ''
   node-version-file:
     description: Path to .nvmrc or similar file
     default: '.nvmrc'
@@ -28,6 +31,7 @@ runs:
       if: inputs.registry-url != '' && inputs.frozen-lockfile == 'true'
       uses: actions/setup-node@v4
       with:
+        node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version-file }}
         cache: pnpm
         registry-url: ${{ inputs.registry-url }}
@@ -37,6 +41,7 @@ runs:
       if: inputs.registry-url != '' && inputs.frozen-lockfile != 'true'
       uses: actions/setup-node@v4
       with:
+        node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version-file }}
         registry-url: ${{ inputs.registry-url }}
         scope: ${{ inputs.scope }}
@@ -45,6 +50,7 @@ runs:
       if: inputs.registry-url == '' && inputs.frozen-lockfile == 'true'
       uses: actions/setup-node@v4
       with:
+        node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version-file }}
         cache: pnpm
 
@@ -52,6 +58,7 @@ runs:
       if: inputs.registry-url == '' && inputs.frozen-lockfile != 'true'
       uses: actions/setup-node@v4
       with:
+        node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version-file }}
 
     - name: Install dependencies (frozen)

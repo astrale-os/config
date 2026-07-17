@@ -3,17 +3,22 @@ packages:
 
 # Block packages released < 7 days ago (10080 minutes) — supply-chain hardening.
 minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
 minimumReleaseAgeExclude:
   - '@astrale-os/*'
   - '@astrale/*'
 
+# Never install implicitly before `pnpm run` or `pnpm exec`.
+verifyDepsBeforeRun: false
+
 # Allowlist of packages permitted to run install scripts (supply-chain hardening).
-onlyBuiltDependencies:
-  - better-sqlite3
-  - cbor-extract
-  - esbuild
-  - lightningcss
-  - msgpackr-extract
-  - protobufjs
-  - sharp
-  - workerd
+allowBuilds:
+  '@parcel/watcher': false
+  better-sqlite3: true
+  cbor-extract: true
+  esbuild: true
+  lightningcss: true
+  msgpackr-extract: true
+  protobufjs: true
+  sharp: true
+  workerd: true

@@ -17,8 +17,6 @@ inputs:
     default: ''
   node-version-file:
     default: '.nvmrc'
-  pnpm-version:
-    default: '10.28.0'
   build-command:
     description: Command that builds the publish set (and its workspace deps).
     default: 'pnpm -r run build'
@@ -37,8 +35,6 @@ runs:
   steps:
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
-      with:
-        version: ${{ inputs.pnpm-version }}
 
     - name: Setup Node.js
       uses: actions/setup-node@v4

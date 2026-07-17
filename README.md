@@ -13,7 +13,7 @@ Shared configurations and composite actions for Astrale TypeScript monorepos.
 
 ## Installation
 
-Requires **pnpm 10.9+** for native JSR support.
+Requires **Node.js 24.18.0** and **pnpm 11.13.1** for development.
 
 ```bash
 pnpm add -D jsr:@astrale/typescript-config jsr:@astrale/commitlint-config
