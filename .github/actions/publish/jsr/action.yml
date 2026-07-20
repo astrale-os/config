@@ -19,20 +19,21 @@ runs:
   using: composite
   steps:
     - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@v6
 
     - name: Setup Node.js (with cache)
       if: inputs.frozen-lockfile == 'true'
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version-file: ${{ inputs.node-version-file }}
         cache: pnpm
 
     - name: Setup Node.js (no cache)
       if: inputs.frozen-lockfile != 'true'
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version-file: ${{ inputs.node-version-file }}
+        package-manager-cache: false
 
     - name: Install dependencies (frozen)
       if: inputs.frozen-lockfile == 'true'

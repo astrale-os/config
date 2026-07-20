@@ -55,11 +55,11 @@ runs:
   using: composite
   steps:
     - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@v6
 
     - name: Setup Node.js (with registry + cache)
       if: inputs.registry-url != '' && inputs.frozen-lockfile == 'true'
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version-file }}
@@ -69,16 +69,17 @@ runs:
 
     - name: Setup Node.js (with registry, no cache)
       if: inputs.registry-url != '' && inputs.frozen-lockfile != 'true'
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version-file }}
+        package-manager-cache: false
         registry-url: ${{ inputs.registry-url }}
         scope: ${{ inputs.scope }}
 
     - name: Setup Node.js (no registry + cache)
       if: inputs.registry-url == '' && inputs.frozen-lockfile == 'true'
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version-file }}
@@ -86,10 +87,11 @@ runs:
 
     - name: Setup Node.js (no registry, no cache)
       if: inputs.registry-url == '' && inputs.frozen-lockfile != 'true'
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version-file }}
+        package-manager-cache: false
 
     - name: Install dependencies (frozen)
       if: inputs.frozen-lockfile == 'true'
