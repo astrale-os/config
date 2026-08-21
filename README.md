@@ -175,12 +175,14 @@ jobs:
       - uses: astrale-os/config/.github/actions/release@main
         with:
           token: ${{ github.token }}
+          target-branch: kernel-v2
 ```
 
-| Input           | Default                         | Description                       |
-| --------------- | ------------------------------- | --------------------------------- |
-| `token`         | required                        | GitHub token for releases and PRs |
-| `config-file`   | `.release-please-config.json`   | Path to config file               |
-| `manifest-file` | `.release-please-manifest.json` | Path to manifest file             |
+| Input           | Default                         | Description                         |
+| --------------- | ------------------------------- | ----------------------------------- |
+| `token`         | required                        | GitHub token for releases and PRs   |
+| `config-file`   | `.release-please-config.json`   | Path to config file                 |
+| `manifest-file` | `.release-please-manifest.json` | Path to manifest file               |
+| `target-branch` | repository default branch       | Branch Release Please should target |
 
 **Outputs:** `releases_created`, `paths_released`

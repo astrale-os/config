@@ -11,6 +11,9 @@ inputs:
   manifest-file:
     description: Path to release-please manifest file
     default: '.release-please-manifest.json'
+  target-branch:
+    description: Branch Release Please should target
+    required: false
 
 outputs:
   releases_created:
@@ -30,3 +33,4 @@ runs:
         token: ${{ inputs.token }}
         config-file: ${{ inputs.config-file }}
         manifest-file: ${{ inputs.manifest-file }}
+        target-branch: ${{ inputs.target-branch || github.event.repository.default_branch }}
