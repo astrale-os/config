@@ -185,4 +185,8 @@ jobs:
 | `manifest-file` | `.release-please-manifest.json` | Path to manifest file               |
 | `target-branch` | repository default branch       | Branch Release Please should target |
 
-**Outputs:** `releases_created`, `paths_released`
+**Outputs:** `releases_created`, `paths_released`, `prs_created`, `pr`, `prs`
+
+The PR outputs are forwarded unchanged from Release Please so callers using the repository
+`GITHUB_TOKEN` can explicitly qualify the generated PR revision. GitHub suppresses workflow events
+created by that token, so relying on the PR's normal `pull_request` event is insufficient.

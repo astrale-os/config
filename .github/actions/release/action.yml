@@ -22,6 +22,15 @@ outputs:
   paths_released:
     description: JSON array of paths that were released
     value: ${{ steps.release.outputs.paths_released }}
+  prs_created:
+    description: Whether a release pull request was created or updated
+    value: ${{ steps.release.outputs.prs_created }}
+  pr:
+    description: JSON Release Please pull request object
+    value: ${{ steps.release.outputs.pr }}
+  prs:
+    description: JSON array of Release Please pull request objects
+    value: ${{ steps.release.outputs.prs }}
 
 runs:
   using: composite
