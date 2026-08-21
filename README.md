@@ -175,7 +175,7 @@ jobs:
       - uses: astrale-os/config/.github/actions/release@main
         with:
           token: ${{ github.token }}
-          target-branch: kernel-v2
+          target-branch: main
 ```
 
 | Input           | Default                         | Description                         |
