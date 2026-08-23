@@ -7,7 +7,9 @@ description: >
 
 inputs:
   dirs:
-    description: Space-separated package directories to consider (relative to repo root).
+    description: >
+      Space-separated package directories, relative to the repo root, in strict
+      producer-before-consumer order. In-set dependency inversions are rejected.
     required: true
   github-token:
     description: Token with packages:write (typically secrets.GITHUB_TOKEN).
@@ -74,6 +76,7 @@ runs:
       shell: bash
       env:
         PUBLISH_DIRS: ${{ inputs.dirs }}
+        PUBLISH_ACTION_PATH: ${{ github.action_path }}
         GH_PACKAGES_TOKEN: ${{ inputs.github-token }}
         NPM_TOKEN: ${{ inputs.npm-token }}
         PRERELEASE_TAG: ${{ inputs.prerelease-tag }}

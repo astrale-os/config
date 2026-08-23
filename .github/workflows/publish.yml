@@ -20,21 +20,25 @@ permissions:
   packages: write
 
 jobs:
-  publish-jsr:
+  publish-jsr-typescript:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        package:
-          - packages/typescript
-          - packages/commitlint
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/publish/jsr
         with:
-          package: ${{ matrix.package }}
+          package: packages/typescript
+
+  publish-jsr-commitlint:
+    needs: publish-jsr-typescript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/publish/jsr
+        with:
+          package: packages/commitlint
 
   publish-ox:
+    needs: publish-jsr-commitlint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

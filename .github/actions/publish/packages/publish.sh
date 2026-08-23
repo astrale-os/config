@@ -19,13 +19,15 @@
 # + each package's Trusted Publisher configured to trust its repo). If NPM_TOKEN is
 # set it is used instead (local runs / migration).
 #
-# Idempotent + fault-tolerant: a version already on a registry is skipped; an
-# "already exists" race is treated as success; a transient skip-check error does
-# NOT blind-publish. Genuine publish errors fail the run; npm auth/OIDC errors are
-# reported as a notice (so a healthy GitHub-Packages publish is not lost).
+# Idempotent + fail-fast: PUBLISH_DIRS is a producer-before-consumer order. Each
+# package is completed on every target registry before the next package starts.
+# A version already on a registry and an "already exists" race are the only
+# successful skips. Unknown skip-checks, authentication failures and publishing
+# errors stop the release immediately, so a consumer can never overtake a failed
+# producer.
 #
 # Env:
-#   PUBLISH_DIRS         space-separated package dirs (required)
+#   PUBLISH_DIRS         space-separated package dirs in producer-first order (required)
 #   GH_PACKAGES_TOKEN    token with packages:write (the repo's GITHUB_TOKEN)
 #   NPM_TOKEN            optional npm token; if unset, npm uses OIDC Trusted Publishing
 #   GITHUB_STEP_SUMMARY  file to append a human summary to (optional)
@@ -43,10 +45,19 @@ NPM_REG="https://registry.npmjs.org"
 : "${RUNNER_TEMP:=$(mktemp -d)}"
 GH_PACKAGES_TOKEN="${GH_PACKAGES_TOKEN:-}"
 NPM_TOKEN="${NPM_TOKEN:-}"
+read -r -a PUBLISH_DIR_ARRAY <<< "$PUBLISH_DIRS"
 
 summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"; return 0; }
 field() { node -p "(require('./$1/package.json').$2)" 2>/dev/null; }
 compact() { printf '%s' "$1" | tr '\n' ' ' | cut -c1-500; }
+
+publish_error() {
+  echo "::error title=Publication stopped::$1" >&2
+  summary "## ❌ Publication stopped"
+  summary ""
+  summary "$1"
+  return 1
+}
 
 # Echoes "<gh> <npm>" booleans (true/false) for a package dir.
 decide() {
@@ -120,99 +131,124 @@ npm_tag_for() {
   esac
 }
 
-# ─── GitHub Packages ─────────────────────────────────────────────────────────
-gh_rc=0; gh_published=""
-if [ -z "$GH_PACKAGES_TOKEN" ]; then
-  echo "::warning title=GitHub Packages publish skipped::no packages token (GITHUB_TOKEN) available"
-  summary "## ⚠️ GitHub Packages publish skipped — no token"
-else
-  # Isolated config so GH operations always hit GitHub Packages, regardless of how
-  # the repo's own .npmrc routes the @astrale-os scope (sdk/shell route it to npm
-  # for install, since their deps are public there — see docs/release.md).
-  GH_NEUTRAL="$RUNNER_TEMP/ghpkg.npmrc"; : > "$GH_NEUTRAL"
-  printf '@astrale-os:registry=%s\n' "$GH_REG" >> "$GH_NEUTRAL"
-  printf '//npm.pkg.github.com/:_authToken=%s\n' "$GH_PACKAGES_TOKEN" >> "$GH_NEUTRAL"
-  for dir in $PUBLISH_DIRS; do
-    read -r gh _ < <(decide "$dir")
-    name=$(field "$dir" name); version=$(field "$dir" version); spec="$name@$version"
-    [ "$gh" = "true" ] || { echo "GH: skip $name (not a GitHub Packages target)"; continue; }
-    exists_on "$spec" "$GH_REG" "$GH_NEUTRAL"; e=$?
-    [ "$e" = "0" ] && { echo "GH: skip $spec (already published)"; continue; }
-    # Inconclusive skip-check (e.g. a 403 because a pre-existing copy is linked to
-    # another repo, or a transient error): GitHub Packages is a best-effort mirror
-    # of packages also on npm, so warn + skip this one rather than failing the run.
-    # We never blind-publish on an inconclusive check.
-    [ "$e" = "2" ] && { echo "::warning title=GitHub Packages skip::inconclusive skip-check for $spec — skipping its GitHub Packages publish (npm is unaffected)"; continue; }
-    if [ "$DRY_RUN" = "1" ]; then echo "GH: WOULD PUBLISH $spec"; continue; fi
-    tarball=$(pack_tarball "$dir") || { echo "::error::pack failed for $spec"; gh_rc=1; continue; }
-    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$GH_NEUTRAL" npm publish "$tarball" --access=restricted --tag "$(npm_tag_for "$version")" --registry="$GH_REG" 2>&1 ); pub=$?
-    if [ "$pub" = "0" ]; then echo "GH: published $spec"; gh_published="$gh_published $spec"
-    elif printf '%s' "$out" | grep -qiE 'already exists|cannot publish over|EPUBLISHCONFLICT|409 Conflict'; then
-      echo "GH: $spec already exists (idempotent skip)"
-    elif printf '%s' "$out" | grep -qiE 'E403|403 Forbidden|permission_denied|do not have permission|not have permission'; then
-      # No permission to publish to GitHub Packages (a pre-existing copy is linked
-      # to another repo). GitHub Packages is a best-effort mirror — warn + skip
-      # rather than fail; npm is the source of truth for these public packages.
-      echo "::warning title=GitHub Packages skip::no permission to publish $spec (copy linked to another repo) — skipping (npm unaffected)"
-    else echo "::error::GitHub Packages publish failed for $spec"; printf '%s\n' "$out"; gh_rc=1; fi
-  done
-fi
+# Isolated configs keep publication routing independent from the repository's
+# install-time .npmrc. npm is the source of truth for public packages; GitHub
+# Packages follows as the required mirror / private-package registry.
+GH_NEUTRAL="$RUNNER_TEMP/ghpkg.npmrc"; : > "$GH_NEUTRAL"
+printf '@astrale-os:registry=%s\n' "$GH_REG" >> "$GH_NEUTRAL"
+[ -n "$GH_PACKAGES_TOKEN" ] && printf '//npm.pkg.github.com/:_authToken=%s\n' "$GH_PACKAGES_TOKEN" >> "$GH_NEUTRAL"
 
-# ─── npm (PUBLIC only) ───────────────────────────────────────────────────────
-# Auth = OIDC Trusted Publishing (no token) unless NPM_TOKEN is set.
 NEUTRAL="$RUNNER_TEMP/npmjs.npmrc"; : > "$NEUTRAL"
-# Neutral config: deliberately NO @astrale-os->GitHub mapping, so scoped public
-# packages resolve to npmjs. Used only from $RUNNER_TEMP (no repo .npmrc in scope).
 printf 'registry=%s\n' "$NPM_REG" >> "$NEUTRAL"
 [ -n "$NPM_TOKEN" ] && printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" >> "$NEUTRAL"
 
-pending=""
-for dir in $PUBLISH_DIRS; do
-  read -r _ npm < <(decide "$dir")
-  name=$(field "$dir" name); version=$(field "$dir" version); spec="$name@$version"
-  [ "$npm" = "true" ] || { echo "npm: skip $name (private / GitHub-Packages-only — never npm)"; continue; }
-  exists_on "$spec" "$NPM_REG" "$NEUTRAL"; e=$?
-  [ "$e" = "0" ] && { echo "npm: skip $spec (already published)"; continue; }
-  [ "$e" = "2" ] && { echo "npm: skip $spec (skip-check inconclusive)"; continue; }
-  pending="$pending ${dir}|${spec}"
+# Validate the declared producer-before-consumer order before touching a registry.
+SCRIPT_DIR="${PUBLISH_ACTION_PATH:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+node "$SCRIPT_DIR/validate-order.mjs" "${PUBLISH_DIR_ARRAY[@]}" || exit 1
+
+# Fail before any publication when a selected package requires GitHub Packages
+# but the action was not given its repository token.
+for dir in "${PUBLISH_DIR_ARRAY[@]}"; do
+  read -r gh _ < <(decide "$dir")
+  if [ "$gh" = "true" ] && [ -z "$GH_PACKAGES_TOKEN" ]; then
+    name=$(field "$dir" name)
+    publish_error "GitHub Packages token is required for $name" || exit 1
+  fi
 done
 
-npm_rc=0; auth_failed=0
-if [ -z "$pending" ]; then
-  echo "npm: nothing new to publish"
-else
-  for item in $pending; do
-    dir="${item%%|*}"; spec="${item#*|}"; tag=$(npm_tag_for "${spec##*@}")
-    if [ "$DRY_RUN" = "1" ]; then echo "npm: WOULD PUBLISH $spec (tag $tag)"; continue; fi
-    tarball=$(pack_tarball "$dir") || { echo "::error::pack failed for $spec"; npm_rc=1; continue; }
-    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$NEUTRAL" npm publish "$tarball" --access public --tag "$tag" --registry="$NPM_REG" 2>&1 ); pub=$?
-    if [ "$pub" = "0" ]; then echo "npm: published $spec"
-    elif printf '%s' "$out" | grep -qiE 'cannot publish over|already exists|EPUBLISHCONFLICT|previously published'; then
-      echo "npm: $spec already exists (idempotent skip)"
-    elif printf '%s' "$out" | grep -qiE 'E401|EOTP|ENEEDAUTH|one-time pass|two-factor|Unable to authenticate|must be logged in|Unauthorized|EOIDC|oidc|id-token|trusted publish'; then
-      echo "::error::npm auth/OIDC blocked publishing $spec: $(compact "$out")"
-      printf '%s\n' "$out" >&2
-      auth_failed=1
-    else echo "::error::npm publish failed for $spec"; printf '%s\n' "$out"; npm_rc=1; fi
-  done
-  if [ "$auth_failed" = "1" ]; then
-    summary "## ⚠️ npm publish blocked by auth/OIDC"
-    summary ""
-    summary "Most likely a package is missing its **Trusted Publisher** on npmjs — it must"
-    summary "trust this repo + workflow (see docs/release.md). Configure it, or set an"
-    summary "\`NPM_TOKEN\` secret, then re-run."
-    echo "::error title=npm auth failed::OIDC/token rejected — configure Trusted Publishing (see docs/release.md)"
-  fi
-fi
+npm_published=""; gh_published=""
 
+publish_one() {
+  local dir="$1" gh npm name version spec e tarball out pub tag
+  read -r gh npm < <(decide "$dir")
+  name=$(field "$dir" name); version=$(field "$dir" version); spec="$name@$version"
+  tarball=""
+
+  # Public registry first: public consumers resolve Astrale packages from npm.
+  if [ "$npm" = "true" ]; then
+    exists_on "$spec" "$NPM_REG" "$NEUTRAL"; e=$?
+    case "$e" in
+      0) echo "npm: skip $spec (already published)" ;;
+      1)
+        tag=$(npm_tag_for "$version")
+        if [ "$DRY_RUN" = "1" ]; then
+          echo "npm: WOULD PUBLISH $spec (tag $tag)"
+        else
+          tarball=$(pack_tarball "$dir") || {
+            publish_error "pack failed for $spec"
+            return 1
+          }
+          out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$NEUTRAL" npm publish "$tarball" --access public --tag "$tag" --registry="$NPM_REG" 2>&1 ); pub=$?
+          if [ "$pub" = "0" ]; then
+            echo "npm: published $spec"
+            npm_published="$npm_published $spec"
+          elif printf '%s' "$out" | grep -qiE 'cannot publish over|already exists|EPUBLISHCONFLICT|previously published'; then
+            echo "npm: $spec already exists (idempotent race skip)"
+          else
+            printf '%s\n' "$out" >&2
+            if printf '%s' "$out" | grep -qiE 'E401|EOTP|ENEEDAUTH|one-time pass|two-factor|Unable to authenticate|must be logged in|Unauthorized|EOIDC|oidc|id-token|trusted publish'; then
+              summary "Most likely **Trusted Publishing** is missing for $spec."
+              publish_error "npm authentication/OIDC blocked $spec: $(compact "$out")"
+            else
+              publish_error "npm publish failed for $spec: $(compact "$out")"
+            fi
+            return 1
+          fi
+        fi
+        ;;
+      *)
+        publish_error "npm skip-check was inconclusive for $spec"
+        return 1
+        ;;
+    esac
+  else
+    echo "npm: skip $name (private / GitHub-Packages-only — never npm)"
+  fi
+
+  # Complete the package's GitHub target before allowing the next package.
+  if [ "$gh" = "true" ]; then
+    exists_on "$spec" "$GH_REG" "$GH_NEUTRAL"; e=$?
+    case "$e" in
+      0) echo "GH: skip $spec (already published)" ;;
+      1)
+        if [ "$DRY_RUN" = "1" ]; then
+          echo "GH: WOULD PUBLISH $spec"
+        else
+          if [ -z "$tarball" ]; then
+            tarball=$(pack_tarball "$dir") || {
+              publish_error "pack failed for $spec"
+              return 1
+            }
+          fi
+          out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$GH_NEUTRAL" npm publish "$tarball" --access=restricted --tag "$(npm_tag_for "$version")" --registry="$GH_REG" 2>&1 ); pub=$?
+          if [ "$pub" = "0" ]; then
+            echo "GH: published $spec"
+            gh_published="$gh_published $spec"
+          elif printf '%s' "$out" | grep -qiE 'already exists|cannot publish over|EPUBLISHCONFLICT|409 Conflict'; then
+            echo "GH: $spec already exists (idempotent race skip)"
+          else
+            printf '%s\n' "$out" >&2
+            publish_error "GitHub Packages publish failed for $spec: $(compact "$out")"
+            return 1
+          fi
+        fi
+        ;;
+      *)
+        publish_error "GitHub Packages skip-check was inconclusive for $spec"
+        return 1
+        ;;
+    esac
+  else
+    echo "GH: skip $name (not a GitHub Packages target)"
+  fi
+}
+
+for dir in "${PUBLISH_DIR_ARRAY[@]}"; do
+  echo "=== publish package: $dir ==="
+  publish_one "$dir" || exit 1
+done
+
+[ -n "$npm_published" ] && { summary "## Published to npm"; for s in $npm_published; do summary "- \`$s\`"; done; }
 [ -n "$gh_published" ] && { summary "## Published to GitHub Packages"; for s in $gh_published; do summary "- \`$s\`"; done; }
 
-rc=0
-[ "$gh_rc" != "0" ] && rc=1
-[ "$npm_rc" != "0" ] && rc=1
-# An auth-blocked npm publish means a release did NOT ship — that must fail the
-# run, not hide behind a green check (a silently-unpublished create-astrale-domain
-# release was missed exactly this way). The summary above says how to fix auth.
-[ "$auth_failed" = "1" ] && rc=1
-echo "=== publish done (gh_rc=$gh_rc npm_rc=$npm_rc) ==="
-exit $rc
+echo "=== publish done (strict producer order preserved) ==="
