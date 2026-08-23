@@ -262,6 +262,27 @@ test('rejects an existing GitHub Packages version with the wrong dist-tag', asyn
   assert.doesNotMatch(result.output, /publish package: consumer/)
 })
 
+test('accepts a GitHub Packages prerelease tag when no latest tag exists', async () => {
+  const result = await runPublisher({
+    manifests: {
+      producer: {
+        name: '@astrale-os/producer',
+        version: '1.0.0-beta.2',
+        publishConfig: { registry: 'https://npm.pkg.github.com' },
+      },
+    },
+    dirs: ['producer'],
+    extraEnv: {
+      GH_PACKAGES_TOKEN: 'fake-token',
+      FAKE_EXISTING: '@astrale-os/producer@1.0.0-beta.2',
+      FAKE_TAGS: '@astrale-os/producer|beta=1.0.0-beta.2',
+    },
+  })
+
+  assert.equal(result.status, 0, result.output)
+  assert.deepEqual(result.calls, [])
+})
+
 test('finishes every producer registry before starting a public consumer', async () => {
   const result = await runPublisher({
     manifests: {
