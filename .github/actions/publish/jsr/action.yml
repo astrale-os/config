@@ -53,7 +53,24 @@ runs:
       shell: bash
       run: pnpm build
 
+    - name: Check whether the JSR version exists
+      id: jsr-version
+      shell: bash
+      working-directory: ${{ inputs.package }}
+      env:
+        CHECK_PUBLISHED: ${{ github.action_path }}/check-published.mjs
+      run: |
+        status=0
+        node "$CHECK_PUBLISHED" || status=$?
+
+        case "$status" in
+          0) echo "published=true" >> "$GITHUB_OUTPUT" ;;
+          1) echo "published=false" >> "$GITHUB_OUTPUT" ;;
+          *) exit "$status" ;;
+        esac
+
     - name: Publish to JSR
+      if: steps.jsr-version.outputs.published != 'true'
       shell: bash
       working-directory: ${{ inputs.package }}
       run: |
@@ -61,11 +78,6 @@ runs:
         if [ "${{ inputs.allow-slow-types }}" = "true" ]; then
           FLAGS="--allow-slow-types"
         fi
-        npx jsr publish $FLAGS || {
-          # Check if it's just "already published" error
-          if [ $? -eq 1 ]; then
-            echo "::warning::Package may already be published at this version"
-          else
-            exit 1
-          fi
-        }
+        # The preflight above is the only idempotent skip. Authentication,
+        # validation, registry and all other publishing errors must stay fatal.
+        npx jsr publish $FLAGS

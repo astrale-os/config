@@ -10,6 +10,7 @@ on:
       - 'packages/ox/**'
       - 'package.json'
       - 'pnpm-workspace.yaml'
+      - '.github/actions/publish/jsr/**'
       - '.github/workflows/publish.yml'
   workflow_dispatch:
 

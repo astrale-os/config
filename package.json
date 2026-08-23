@@ -16,7 +16,8 @@
     "lint:fix": "oxlint --fix .",
     "format": "pnpm exec oxfmt --write .",
     "format:check": "pnpm exec oxfmt --check .",
-    "test": "pnpm -r --if-present run test",
+    "test": "pnpm test:jsr-publish && pnpm -r --if-present run test",
+    "test:jsr-publish": "node --test .github/actions/publish/jsr/check-published.test.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
