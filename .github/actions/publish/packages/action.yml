@@ -51,7 +51,9 @@ runs:
         # Pinned to the 11.x line: npm@12.0.0 (2026-07-10) ships without the
         # `sigstore` module its own libnpmpublish requires — every publish dies
         # with MODULE_NOT_FOUND. Bump deliberately once 12.x is proven.
-        npm install -g npm@11
+        # Published 2026-07-29T20:24:07.500Z; older than the seven-day
+        # quarantine when pinned on 2026-08-23.
+        npm install -g npm@11.19.0
         npm --version
 
     - name: Configure install registries
