@@ -52,16 +52,14 @@ runs:
         npm install -g npm@11
         npm --version
 
-    - name: Configure registries
+    - name: Configure install registries
       shell: bash
-      env:
-        NODE_AUTH_TOKEN: ${{ inputs.github-token }}
       run: |
         set -eu
         {
           printf '%s\n' '@jsr:registry=https://npm.jsr.io'
-          printf '%s\n' '@astrale-os:registry=https://npm.pkg.github.com'
-          printf '%s\n' "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}"
+          printf '%s\n' 'registry=https://registry.npmjs.org'
+          printf '%s\n' '@astrale-os:registry=https://registry.npmjs.org'
         } >> "$HOME/.npmrc"
 
     - name: Install dependencies

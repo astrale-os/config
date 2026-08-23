@@ -21,14 +21,13 @@
   },
   "devDependencies": {
     "@astrale-os/ox": "workspace:*",
-    "@commitlint/cli": "~20.3.1",
-    "@commitlint/config-conventional": "~20.3.1",
-    "@typescript/native-preview": "latest",
+    "@commitlint/cli": "~21.2.2",
+    "@commitlint/config-conventional": "~21.2.2",
     "husky": "~9.1.7",
-    "lint-staged": "~16.2.7",
-    "oxfmt": "0.52.0",
-    "oxlint": "latest",
-    "typescript": "~6.0.1-rc"
+    "lint-staged": "~17.3.0",
+    "oxfmt": "0.63.0",
+    "oxlint": "1.78.0",
+    "typescript": "~7.0.2"
   },
   "lint-staged": {
     "*.ts": [
