@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.4](https://github.com/astrale-os/config/compare/commitlint-config-v2.0.3...commitlint-config-v2.0.4) (2026-08-23)
+
+
+### Bug Fixes
+
+* **commitlint:** support commitlint 21 ([#18](https://github.com/astrale-os/config/issues/18)) ([d395309](https://github.com/astrale-os/config/commit/d395309189e7883d8aedf8bfd680e7f03ddc1633))
+
 ## [2.0.3](https://github.com/astrale-os/config/compare/commitlint-config-v2.0.2...commitlint-config-v2.0.3) (2026-07-11)
 
 
