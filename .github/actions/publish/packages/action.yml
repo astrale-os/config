@@ -3,7 +3,8 @@ description: >
   Build and publish a repo's packages to GitHub Packages (all @astrale-os/* scoped)
   and npm (public packages only), idempotently. Never publishes a private package
   to npm. GitHub Packages uses the repo's own GITHUB_TOKEN; npm uses OIDC Trusted
-  Publishing (no token) unless npm-token is supplied. See docs/release.md.
+  Publishing (no token) unless npm-token is supplied. Every target dist-tag is
+  verified against the exact version before the next package starts. See docs/release.md.
 
 inputs:
   dirs:

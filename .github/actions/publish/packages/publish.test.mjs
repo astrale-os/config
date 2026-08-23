@@ -14,9 +14,18 @@ const npmStub = [
   'case "${1:-}" in',
   '  view)',
   '    spec="${2:-}"',
+  '    field="${3:-}"',
   '    if [ -n "${FAKE_VIEW_FAIL_CONTAINS:-}" ] && [[ "$spec" == *"$FAKE_VIEW_FAIL_CONTAINS"* ]]; then',
   '      echo "npm error code E500" >&2',
   '      exit 1',
+  '    fi',
+  '    if [[ "$field" == dist-tags.* ]]; then',
+  '      key="$spec|${field#dist-tags.}"',
+  '      IFS=, read -r -a tags <<< "${FAKE_TAGS:-}"',
+  '      for entry in "${tags[@]}"; do',
+  '        if [[ "$entry" == "$key="* ]]; then printf "%s\\n" "${entry#*=}"; exit 0; fi',
+  '      done',
+  '      exit 0',
   '    fi',
   '    case ",${FAKE_EXISTING:-}," in',
   '      *",$spec,"*) printf "%s\\n" "${spec##*@}"; exit 0 ;;',
@@ -75,6 +84,14 @@ async function runPublisher({ manifests, dirs, extraEnv = {} }) {
     ])
     await Promise.all([chmod(join(fakeBin, 'npm'), 0o755), chmod(join(fakeBin, 'pnpm'), 0o755)])
 
+    const fakeTags = dirs
+      .map((dir) => {
+        const { name, version } = manifests[dir]
+        const prerelease = version.includes('-') ? version.split('-')[1].split('.')[0] : 'latest'
+        return `${name}|${prerelease}=${version}`
+      })
+      .join(',')
+
     const result = spawnSync('bash', [publisher], {
       cwd: root,
       encoding: 'utf8',
@@ -86,6 +103,9 @@ async function runPublisher({ manifests, dirs, extraEnv = {} }) {
         GH_PACKAGES_TOKEN: '',
         NPM_TOKEN: '',
         FAKE_PUBLISH_LOG: publishLog,
+        FAKE_TAGS: fakeTags,
+        DIST_TAG_VERIFY_ATTEMPTS: '1',
+        DIST_TAG_VERIFY_DELAY_SECONDS: '0',
         ...extraEnv,
       },
     })
@@ -160,6 +180,29 @@ test('an existing producer is an idempotent skip and allows its consumer', async
   assert.match(result.calls[0], /consumer\.tgz/)
 })
 
+test('rejects an existing version whose release-channel tag points elsewhere', async () => {
+  const result = await runPublisher({
+    manifests: {
+      producer: { name: 'producer', version: '1.0.0-beta.2' },
+      consumer: {
+        name: 'consumer',
+        version: '1.0.0-beta.2',
+        dependencies: { producer: '^1.0.0-beta.2' },
+      },
+    },
+    dirs: ['producer', 'consumer'],
+    extraEnv: {
+      FAKE_EXISTING: 'producer@1.0.0-beta.2',
+      FAKE_TAGS: 'producer|beta=1.0.0-beta.1,consumer|beta=1.0.0-beta.2',
+    },
+  })
+
+  assert.equal(result.status, 1)
+  assert.deepEqual(result.calls, [])
+  assert.match(result.output, /npm dist-tag producer@beta does not resolve to 1\.0\.0-beta\.2/)
+  assert.doesNotMatch(result.output, /publish package: consumer/)
+})
+
 test('stops before a consumer when its GitHub Packages producer fails', async () => {
   const result = await runPublisher({
     manifests: {
@@ -181,6 +224,33 @@ test('stops before a consumer when its GitHub Packages producer fails', async ()
   assert.equal(result.status, 1)
   assert.equal(result.calls.length, 1)
   assert.match(result.calls[0], /producer\.tgz/)
+  assert.doesNotMatch(result.output, /publish package: consumer/)
+})
+
+test('rejects an existing GitHub Packages version with the wrong dist-tag', async () => {
+  const result = await runPublisher({
+    manifests: {
+      producer: {
+        name: '@astrale-os/producer',
+        version: '1.0.0-beta.2',
+        publishConfig: { registry: 'https://npm.pkg.github.com' },
+      },
+      consumer: { name: 'consumer', version: '1.0.0-beta.2' },
+    },
+    dirs: ['producer', 'consumer'],
+    extraEnv: {
+      GH_PACKAGES_TOKEN: 'fake-token',
+      FAKE_EXISTING: '@astrale-os/producer@1.0.0-beta.2',
+      FAKE_TAGS: '@astrale-os/producer|beta=1.0.0-beta.1,consumer|beta=1.0.0-beta.2',
+    },
+  })
+
+  assert.equal(result.status, 1)
+  assert.deepEqual(result.calls, [])
+  assert.match(
+    result.output,
+    /GitHub Packages dist-tag @astrale-os\/producer@beta does not resolve to 1\.0\.0-beta\.2/,
+  )
   assert.doesNotMatch(result.output, /publish package: consumer/)
 })
 
