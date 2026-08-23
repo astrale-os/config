@@ -1,6 +1,6 @@
 {
   "name": "@astrale-os/commitlint-config",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Shared Commitlint configuration for Astrale OS projects",
   "keywords": [
     "astrale",
