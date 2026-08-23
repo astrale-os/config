@@ -25,7 +25,7 @@ inputs:
     default: 'pnpm -r run build'
   install-command:
     description: Command that installs the publish set (and its workspace dependencies).
-    default: 'STANDALONE=true pnpm install --no-frozen-lockfile'
+    default: 'STANDALONE=true pnpm install --frozen-lockfile'
   prerelease-tag:
     description: >
       npm dist-tag for prerelease versions (e.g. -alpha.N). 'auto' (default) derives
