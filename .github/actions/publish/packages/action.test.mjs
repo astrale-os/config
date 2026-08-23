@@ -14,3 +14,11 @@ test('pins the publisher npm toolchain to one immutable npm 11 release', () => {
     'publisher npm must be an exact stable npm 11 version, never a range or dist-tag',
   )
 })
+
+test('installs publication workspaces from the committed lockfile', () => {
+  assert.match(
+    action,
+    /install-command:\n(?: {4}.+\n)*? {4}default: 'STANDALONE=true pnpm install --frozen-lockfile'/,
+  )
+  assert.doesNotMatch(action, /--no-frozen-lockfile/)
+})
