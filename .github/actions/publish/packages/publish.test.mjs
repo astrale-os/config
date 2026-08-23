@@ -20,18 +20,26 @@ const npmStub = [
   '      exit 1',
   '    fi',
   '    if [[ "$field" == dist-tags.* ]]; then',
-  '      key="$spec|${field#dist-tags.}"',
-  '      IFS=, read -r -a tags <<< "${FAKE_TAGS:-}"',
-  '      for entry in "${tags[@]}"; do',
-  '        if [[ "$entry" == "$key="* ]]; then printf "%s\\n" "${entry#*=}"; exit 0; fi',
-  '      done',
-  '      exit 0',
+  '      echo "publisher must use npm dist-tag ls, not npm view dist-tags" >&2',
+  '      exit 8',
   '    fi',
   '    case ",${FAKE_EXISTING:-}," in',
   '      *",$spec,"*) printf "%s\\n" "${spec##*@}"; exit 0 ;;',
   '    esac',
   '    echo "npm error code E404" >&2',
   '    exit 1',
+  '    ;;',
+  '  dist-tag)',
+  '    [ "${2:-}" = ls ] || { echo "unexpected npm dist-tag command: $*" >&2; exit 9; }',
+  '    name="${3:-}"',
+  '    IFS=, read -r -a tags <<< "${FAKE_TAGS:-}"',
+  '    for entry in "${tags[@]}"; do',
+  '      if [[ "$entry" == "$name|"*"="* ]]; then',
+  '        key="${entry%%=*}"',
+  '        printf "%s: %s\\n" "${key#*|}" "${entry#*=}"',
+  '      fi',
+  '    done',
+  '    exit 0',
   '    ;;',
   '  publish)',
   '    printf "%s\\n" "$*" >> "$FAKE_PUBLISH_LOG"',
@@ -252,6 +260,27 @@ test('rejects an existing GitHub Packages version with the wrong dist-tag', asyn
     /GitHub Packages dist-tag @astrale-os\/producer@beta does not resolve to 1\.0\.0-beta\.2/,
   )
   assert.doesNotMatch(result.output, /publish package: consumer/)
+})
+
+test('accepts a GitHub Packages prerelease tag when no latest tag exists', async () => {
+  const result = await runPublisher({
+    manifests: {
+      producer: {
+        name: '@astrale-os/producer',
+        version: '1.0.0-beta.2',
+        publishConfig: { registry: 'https://npm.pkg.github.com' },
+      },
+    },
+    dirs: ['producer'],
+    extraEnv: {
+      GH_PACKAGES_TOKEN: 'fake-token',
+      FAKE_EXISTING: '@astrale-os/producer@1.0.0-beta.2',
+      FAKE_TAGS: '@astrale-os/producer|beta=1.0.0-beta.2',
+    },
+  })
+
+  assert.equal(result.status, 0, result.output)
+  assert.deepEqual(result.calls, [])
 })
 
 test('finishes every producer registry before starting a public consumer', async () => {

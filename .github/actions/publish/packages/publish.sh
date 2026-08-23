@@ -143,8 +143,12 @@ verify_dist_tag() {
   local attempt=1 out code
 
   while [ "$attempt" -le "$attempts" ]; do
-    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$cfg" npm view "$name" "dist-tags.$tag" --registry="$reg" 2>&1 ); code=$?
-    if [ "$code" = "0" ] && [ "$out" = "$version" ]; then
+    # Use the registry's dedicated dist-tag endpoint. GitHub Packages can return
+    # an incomplete packument to a repository GITHUB_TOKEN: the immutable
+    # version remains visible while `npm view name dist-tags.tag` is empty. The
+    # dedicated endpoint is the authoritative API for this mutable metadata.
+    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$cfg" npm dist-tag ls "$name" --registry="$reg" 2>&1 ); code=$?
+    if [ "$code" = "0" ] && printf '%s\n' "$out" | grep -Fxq "$tag: $version"; then
       return 0
     fi
     if [ "$attempt" -lt "$attempts" ]; then
