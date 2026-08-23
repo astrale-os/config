@@ -24,7 +24,9 @@
 # A version already on a registry and an "already exists" race are the only
 # successful skips. Unknown skip-checks, authentication failures and publishing
 # errors stop the release immediately, so a consumer can never overtake a failed
-# producer.
+# producer. Every successful publish or idempotent skip also proves that the
+# expected dist-tag points to the exact version; an immutable version without its
+# release-channel tag is not a completed publication.
 #
 # Env:
 #   PUBLISH_DIRS         space-separated package dirs in producer-first order (required)
@@ -131,6 +133,30 @@ npm_tag_for() {
   esac
 }
 
+# Prove that a registry's expected release-channel tag resolves to the exact
+# immutable version. Registry propagation can lag briefly after npm publish, so
+# real workflows retry; tests override the attempts and delay to remain instant.
+verify_dist_tag() {
+  local name="$1" version="$2" tag="$3" reg="$4" cfg="$5"
+  local attempts="${DIST_TAG_VERIFY_ATTEMPTS:-6}"
+  local delay="${DIST_TAG_VERIFY_DELAY_SECONDS:-5}"
+  local attempt=1 out code
+
+  while [ "$attempt" -le "$attempts" ]; do
+    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$cfg" npm view "$name" "dist-tags.$tag" --registry="$reg" 2>&1 ); code=$?
+    if [ "$code" = "0" ] && [ "$out" = "$version" ]; then
+      return 0
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep "$delay"
+    fi
+    attempt=$((attempt + 1))
+  done
+
+  echo "::warning::dist-tag check for $name@$version on $reg returned: $(compact "$out")" >&2
+  return 1
+}
+
 # Isolated configs keep publication routing independent from the repository's
 # install-time .npmrc. npm is the source of truth for public packages; GitHub
 # Packages follows as the required mirror / private-package registry.
@@ -162,7 +188,7 @@ publish_one() {
   local dir="$1" gh npm name version spec e tarball out pub tag
   read -r gh npm < <(decide "$dir")
   name=$(field "$dir" name); version=$(field "$dir" version); spec="$name@$version"
-  tarball=""
+  tarball=""; tag=$(npm_tag_for "$version")
 
   # Public registry first: public consumers resolve Astrale packages from npm.
   if [ "$npm" = "true" ]; then
@@ -170,7 +196,6 @@ publish_one() {
     case "$e" in
       0) echo "npm: skip $spec (already published)" ;;
       1)
-        tag=$(npm_tag_for "$version")
         if [ "$DRY_RUN" = "1" ]; then
           echo "npm: WOULD PUBLISH $spec (tag $tag)"
         else
@@ -201,6 +226,10 @@ publish_one() {
         return 1
         ;;
     esac
+    if { [ "$e" = "0" ] || [ "$DRY_RUN" != "1" ]; } && ! verify_dist_tag "$name" "$version" "$tag" "$NPM_REG" "$NEUTRAL"; then
+      publish_error "npm dist-tag $name@$tag does not resolve to $version"
+      return 1
+    fi
   else
     echo "npm: skip $name (private / GitHub-Packages-only — never npm)"
   fi
@@ -220,7 +249,7 @@ publish_one() {
               return 1
             }
           fi
-          out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$GH_NEUTRAL" npm publish "$tarball" --access=restricted --tag "$(npm_tag_for "$version")" --registry="$GH_REG" 2>&1 ); pub=$?
+          out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$GH_NEUTRAL" npm publish "$tarball" --access=restricted --tag "$tag" --registry="$GH_REG" 2>&1 ); pub=$?
           if [ "$pub" = "0" ]; then
             echo "GH: published $spec"
             gh_published="$gh_published $spec"
@@ -238,6 +267,10 @@ publish_one() {
         return 1
         ;;
     esac
+    if { [ "$e" = "0" ] || [ "$DRY_RUN" != "1" ]; } && ! verify_dist_tag "$name" "$version" "$tag" "$GH_REG" "$GH_NEUTRAL"; then
+      publish_error "GitHub Packages dist-tag $name@$tag does not resolve to $version"
+      return 1
+    fi
   else
     echo "GH: skip $name (not a GitHub Packages target)"
   fi
