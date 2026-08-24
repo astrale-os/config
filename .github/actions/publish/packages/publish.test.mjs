@@ -10,7 +10,9 @@ const publisher = fileURLToPath(new URL('./publish.sh', import.meta.url))
 const publisherSource = await readFile(publisher, 'utf8')
 const actionSource = await readFile(new URL('./action.yml', import.meta.url), 'utf8')
 
-test('allows five minutes for registry dist-tag propagation by default', () => {
+test('allows five minutes for immutable version and dist-tag propagation by default', () => {
+  assert.match(publisherSource, /VERSION_VERIFY_ATTEMPTS:-60/)
+  assert.match(publisherSource, /VERSION_VERIFY_DELAY_SECONDS:-5/)
   assert.match(publisherSource, /DIST_TAG_VERIFY_ATTEMPTS:-60/)
   assert.match(publisherSource, /DIST_TAG_VERIFY_DELAY_SECONDS:-5/)
 })
@@ -39,6 +41,22 @@ const npmStub = [
   '    case ",${FAKE_EXISTING:-}," in',
   '      *",$spec,"*) printf "%s\\n" "${spec##*@}"; exit 0 ;;',
   '    esac',
+  '    name="${spec%@*}"',
+  '    slug="${name##*/}"',
+  '    registry=npm',
+  '    [[ "$*" != *npm.pkg.github.com* ]] || registry=gh',
+  '    marker="$FAKE_PUBLISHED_DIR/$slug.$registry"',
+  '    if [ -f "$marker" ]; then',
+  '      count=0',
+  '      counter="$marker.views"',
+  '      [ ! -f "$counter" ] || read -r count < "$counter"',
+  '      count=$((count + 1))',
+  '      printf "%s\\n" "$count" > "$counter"',
+  '      if [ "$count" -gt "${FAKE_VERSION_DELAY_CALLS:-0}" ]; then',
+  '        printf "%s\\n" "${spec##*@}"',
+  '        exit 0',
+  '      fi',
+  '    fi',
   '    echo "npm error code E404" >&2',
   '    exit 1',
   '    ;;',
@@ -67,6 +85,11 @@ const npmStub = [
   '      echo "${FAKE_FAIL_OUTPUT:-npm error code E500}" >&2',
   '      exit 1',
   '    fi',
+  '    tarball="${2:-}"',
+  '    slug="$(basename "$tarball" .tgz)"',
+  '    registry=npm',
+  '    [[ "$*" != *npm.pkg.github.com* ]] || registry=gh',
+  '    : > "$FAKE_PUBLISHED_DIR/$slug.$registry"',
   '    echo "+ fake publish"',
   '    exit 0',
   '    ;;',
@@ -99,7 +122,7 @@ async function runPublisher({ manifests, dirs, extraEnv = {} }) {
   const publishLog = join(root, 'publish.log')
 
   try {
-    await Promise.all([mkdir(fakeBin), mkdir(runnerTemp)])
+    await Promise.all([mkdir(fakeBin), mkdir(runnerTemp), mkdir(join(root, 'published'))])
     await Promise.all(
       Object.entries(manifests).map(async ([dir, manifest]) => {
         await mkdir(join(root, dir), { recursive: true })
@@ -132,8 +155,11 @@ async function runPublisher({ manifests, dirs, extraEnv = {} }) {
         MIRROR_PUBLIC_PACKAGES: 'true',
         NPM_TOKEN: '',
         FAKE_PUBLISH_LOG: publishLog,
+        FAKE_PUBLISHED_DIR: join(root, 'published'),
         FAKE_TAG_COUNTER: join(root, 'tag-counter'),
         FAKE_TAGS: fakeTags,
+        VERSION_VERIFY_ATTEMPTS: '1',
+        VERSION_VERIFY_DELAY_SECONDS: '0',
         DIST_TAG_VERIFY_ATTEMPTS: '1',
         DIST_TAG_VERIFY_DELAY_SECONDS: '0',
         ...extraEnv,
@@ -206,6 +232,21 @@ test('waits for a published dist-tag to propagate before continuing', async () =
       DIST_TAG_VERIFY_ATTEMPTS: '3',
       DIST_TAG_VERIFY_DELAY_SECONDS: '0',
       FAKE_TAG_DELAY_CALLS: '2',
+    },
+  })
+
+  assert.equal(result.status, 0, result.output)
+  assert.equal(result.calls.length, 1)
+})
+
+test('waits for an acknowledged immutable version to become registry-visible', async () => {
+  const result = await runPublisher({
+    manifests: { producer: npmPackages.producer },
+    dirs: ['producer'],
+    extraEnv: {
+      VERSION_VERIFY_ATTEMPTS: '3',
+      VERSION_VERIFY_DELAY_SECONDS: '0',
+      FAKE_VERSION_DELAY_CALLS: '2',
     },
   })
 

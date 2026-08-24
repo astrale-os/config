@@ -176,6 +176,27 @@ verify_dist_tag() {
   return 1
 }
 
+# Prove that an acknowledged immutable publication is fetchable through the
+# ordinary package-metadata endpoint before a dependent package or qualifier
+# starts. A mutable dist-tag can propagate ahead of this exact lookup.
+verify_version() {
+  local spec="$1" reg="$2" cfg="$3"
+  local attempts="${VERSION_VERIFY_ATTEMPTS:-60}"
+  local delay="${VERSION_VERIFY_DELAY_SECONDS:-5}"
+  local attempt=1 state
+
+  while [ "$attempt" -le "$attempts" ]; do
+    exists_on "$spec" "$reg" "$cfg"; state=$?
+    [ "$state" = "0" ] && return 0
+    if [ "$attempt" -lt "$attempts" ]; then
+      sleep "$delay"
+    fi
+    attempt=$((attempt + 1))
+  done
+
+  return 1
+}
+
 # Isolated configs keep publication routing independent from the repository's
 # install-time .npmrc. npm is the source of truth for public packages; GitHub
 # Packages follows as the required mirror / private-package registry.
@@ -244,9 +265,15 @@ publish_one() {
         return 1
         ;;
     esac
-    if { [ "$e" = "0" ] || [ "$DRY_RUN" != "1" ]; } && ! verify_dist_tag "$name" "$version" "$tag" "$NPM_REG" "$NEUTRAL"; then
-      publish_error "npm dist-tag $name@$tag does not resolve to $version"
-      return 1
+    if { [ "$e" = "0" ] || [ "$DRY_RUN" != "1" ]; }; then
+      if ! verify_version "$spec" "$NPM_REG" "$NEUTRAL"; then
+        publish_error "npm immutable version $spec is not registry-visible"
+        return 1
+      fi
+      if ! verify_dist_tag "$name" "$version" "$tag" "$NPM_REG" "$NEUTRAL"; then
+        publish_error "npm dist-tag $name@$tag does not resolve to $version"
+        return 1
+      fi
     fi
   else
     echo "npm: skip $name (private / GitHub-Packages-only — never npm)"
