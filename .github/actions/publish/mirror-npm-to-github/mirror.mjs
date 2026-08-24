@@ -132,8 +132,11 @@ function admitCandidate(directory, manifest, repository) {
     fail(`Mirror package in ${directory} must use the @astrale-os scope.`)
   }
   if (manifest.private === true) fail(`Mirror package ${name} is private in its npm manifest.`)
-  const registry = String(manifest.publishConfig?.registry ?? '').toLowerCase()
-  if (manifest.publishConfig?.access === 'restricted' || registry.includes('npm.pkg.github.com')) {
+  const registry = manifest.publishConfig?.registry
+  if (
+    manifest.publishConfig?.access === 'restricted' ||
+    (registry !== undefined && registryOrigin(registry) !== NPM_REGISTRY)
+  ) {
     fail(`Mirror package ${name} is not an npm-public package.`)
   }
   if (typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(version)) {
@@ -148,6 +151,15 @@ function admitCandidate(directory, manifest, repository) {
     slug: name.slice('@astrale-os/'.length),
     version,
     spec: `${name}@${version}`,
+  }
+}
+
+function registryOrigin(input) {
+  if (typeof input !== 'string') return undefined
+  try {
+    return new URL(input).origin.toLowerCase()
+  } catch {
+    return undefined
   }
 }
 

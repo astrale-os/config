@@ -121,6 +121,21 @@ test('fails missing credentials and invalid manifests before any registry access
     )
     assert.equal(fake.calls.length, 0)
     assert.equal(fake.apiCalls.length, 0)
+
+    manifest.publishConfig = {
+      access: 'public',
+      registry: 'https://npm.pkg.github.com.attacker.example',
+    }
+    await writeFile(
+      join(root, candidate.directory, 'package.json'),
+      `${JSON.stringify(manifest)}\n`,
+    )
+    await assert.rejects(
+      mirrorPackages(input(root, [candidate.directory], fake.run, request)),
+      /not an npm-public package/u,
+    )
+    assert.equal(fake.calls.length, 0)
+    assert.equal(fake.apiCalls.length, 0)
   })
 })
 
@@ -559,7 +574,8 @@ function fakeBoundary(candidates) {
   }
   boundary.run = (_command, args, options) => {
     calls.push(args)
-    const github = args.includes('https://npm.pkg.github.com')
+    const registryIndex = args.indexOf('--registry')
+    const github = registryIndex >= 0 && args[registryIndex + 1] === 'https://npm.pkg.github.com'
     const configPath = options.env.NPM_CONFIG_USERCONFIG
     const config = {
       github,
