@@ -16,8 +16,8 @@
 # AUTH: GitHub Packages uses the repo's own GITHUB_TOKEN (passed as GH_PACKAGES_TOKEN)
 # — each repo owns its own packages, so no PAT is needed. npm uses GitHub Actions
 # OIDC "Trusted Publishing" (no stored token; needs `id-token: write` + npm >= 11.5.1
-# + each package's Trusted Publisher configured to trust its repo). If NPM_TOKEN is
-# set it is used instead (local runs / migration).
+# + each package's Trusted Publisher configured to trust its repo). npm tokens are
+# deliberately rejected: there is no local, migration or CI fallback.
 #
 # Idempotent + fail-fast: PUBLISH_DIRS is a producer-before-consumer order. Each
 # package is completed on every target registry before the next package starts.
@@ -31,7 +31,6 @@
 # Env:
 #   PUBLISH_DIRS         space-separated package dirs in producer-first order (required)
 #   GH_PACKAGES_TOKEN    token with packages:write (the repo's GITHUB_TOKEN)
-#   NPM_TOKEN            optional npm token; if unset, npm uses OIDC Trusted Publishing
 #   GITHUB_STEP_SUMMARY  file to append a human summary to (optional)
 #   RUNNER_TEMP          scratch dir (optional; defaults to a mktemp dir)
 # Flags:
@@ -46,7 +45,11 @@ NPM_REG="https://registry.npmjs.org"
 : "${PUBLISH_DIRS:?set PUBLISH_DIRS}"
 : "${RUNNER_TEMP:=$(mktemp -d)}"
 GH_PACKAGES_TOKEN="${GH_PACKAGES_TOKEN:-}"
-NPM_TOKEN="${NPM_TOKEN:-}"
+if [ -n "${NPM_TOKEN:-}" ] || [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+  echo "::error title=Publication stopped::npm token authentication is forbidden; use OIDC Trusted Publishing" >&2
+  exit 1
+fi
+unset NPM_TOKEN NODE_AUTH_TOKEN
 read -r -a PUBLISH_DIR_ARRAY <<< "$PUBLISH_DIRS"
 
 summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"; return 0; }
@@ -173,7 +176,6 @@ printf '@astrale-os:registry=%s\n' "$GH_REG" >> "$GH_NEUTRAL"
 
 NEUTRAL="$RUNNER_TEMP/npmjs.npmrc"; : > "$NEUTRAL"
 printf 'registry=%s\n' "$NPM_REG" >> "$NEUTRAL"
-[ -n "$NPM_TOKEN" ] && printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" >> "$NEUTRAL"
 
 # Validate the declared producer-before-consumer order before touching a registry.
 SCRIPT_DIR="${PUBLISH_ACTION_PATH:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"

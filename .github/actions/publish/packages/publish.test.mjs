@@ -8,10 +8,17 @@ import { fileURLToPath } from 'node:url'
 
 const publisher = fileURLToPath(new URL('./publish.sh', import.meta.url))
 const publisherSource = await readFile(publisher, 'utf8')
+const actionSource = await readFile(new URL('./action.yml', import.meta.url), 'utf8')
 
 test('allows five minutes for registry dist-tag propagation by default', () => {
   assert.match(publisherSource, /DIST_TAG_VERIFY_ATTEMPTS:-60/)
   assert.match(publisherSource, /DIST_TAG_VERIFY_DELAY_SECONDS:-5/)
+})
+
+test('offers no npm token input or registry-token fallback', () => {
+  assert.doesNotMatch(actionSource, /npm-token|NPM_TOKEN/u)
+  assert.doesNotMatch(publisherSource, /registry\.npmjs\.org\/:_authToken/u)
+  assert.match(publisherSource, /npm token authentication is forbidden/u)
 })
 
 const npmStub = [
@@ -176,6 +183,18 @@ test('publishes producers and consumers sequentially on success', async () => {
   assert.equal(result.calls.length, 2)
   assert.match(result.calls[0], /producer\.tgz/)
   assert.match(result.calls[1], /consumer\.tgz/)
+})
+
+test('rejects an ambient npm token instead of using it as a fallback', async () => {
+  const result = await runPublisher({
+    manifests: npmPackages,
+    dirs: ['producer'],
+    extraEnv: { NPM_TOKEN: 'forbidden-token' },
+  })
+
+  assert.equal(result.status, 1)
+  assert.deepEqual(result.calls, [])
+  assert.match(result.output, /npm token authentication is forbidden/u)
 })
 
 test('waits for a published dist-tag to propagate before continuing', async () => {
