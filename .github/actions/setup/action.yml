@@ -18,7 +18,7 @@ inputs:
     description: Optional auth token for registry
     default: ''
   frozen-lockfile:
-    description: Use frozen lockfile (set to false if lockfile may not exist)
+    description: Use the repository lockfile without allowing dependency drift
     default: 'true'
 
 runs:

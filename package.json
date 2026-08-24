@@ -16,7 +16,8 @@
     "lint:fix": "oxlint --fix .",
     "format": "pnpm exec oxfmt --write .",
     "format:check": "pnpm exec oxfmt --check .",
-    "test": "pnpm test:jsr-publish && pnpm test:publish-packages && pnpm -r --if-present run test",
+    "test": "pnpm test:action-defaults && pnpm test:jsr-publish && pnpm test:publish-packages && pnpm -r --if-present run test",
+    "test:action-defaults": "node --test .github/actions/frozen-lockfile-defaults.test.mjs",
     "test:jsr-publish": "node --test .github/actions/publish/jsr/check-published.test.mjs",
     "test:publish-packages": "node --test .github/actions/publish/packages/*.test.mjs",
     "prepare": "husky"

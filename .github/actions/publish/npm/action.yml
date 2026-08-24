@@ -18,8 +18,8 @@ inputs:
     description: npm registry token
     required: true
   frozen-lockfile:
-    description: Use frozen lockfile (set to false if lockfile may not exist)
-    default: 'false'
+    description: Use the repository lockfile without allowing dependency drift
+    default: 'true'
 
 runs:
   using: composite

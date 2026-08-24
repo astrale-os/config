@@ -27,6 +27,7 @@ jobs:
       - uses: ./.github/actions/publish/jsr
         with:
           package: packages/typescript
+          frozen-lockfile: 'true'
 
   publish-jsr-commitlint:
     needs: publish-jsr-typescript
@@ -36,6 +37,7 @@ jobs:
       - uses: ./.github/actions/publish/jsr
         with:
           package: packages/commitlint
+          frozen-lockfile: 'true'
 
   publish-ox:
     needs: publish-jsr-commitlint
