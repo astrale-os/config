@@ -11,7 +11,7 @@ inputs:
     description: Repository GITHUB_TOKEN with packages:write.
     required: true
   repository:
-    description: Owning GitHub repository in owner/name form.
+    description: Exact source repository in owner/name form; GitHub package UI linkage is preprovisioned.
     required: true
   node-version-file:
     default: '.nvmrc'

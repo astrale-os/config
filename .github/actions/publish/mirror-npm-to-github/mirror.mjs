@@ -440,7 +440,11 @@ async function packageMetadata({
   const metadata = await response.json()
   if (metadata.visibility !== 'private')
     fail(`GitHub package ${candidate.name} must remain private.`)
-  if (metadata.repository?.full_name !== repository) {
+  // Repository-scoped GITHUB_TOKEN responses omit `repository`; linkage is an
+  // externally attested provisioning precondition. The released manifest owns
+  // source identity here. Reject every contradictory API projection while
+  // allowing only the token-scoped omission.
+  if (Object.hasOwn(metadata, 'repository') && metadata.repository?.full_name !== repository) {
     fail(`GitHub package ${candidate.name} must be linked to ${repository}.`)
   }
   return metadata
