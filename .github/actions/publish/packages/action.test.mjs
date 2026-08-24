@@ -22,3 +22,8 @@ test('installs publication workspaces from the committed lockfile', () => {
   )
   assert.doesNotMatch(action, /--no-frozen-lockfile/)
 })
+
+test('keeps the public GitHub Packages mirror explicit and enabled by default', () => {
+  assert.match(action, /mirror-public-packages:\n(?: {4}.+\n)*? {4}default: 'true'/)
+  assert.match(action, /MIRROR_PUBLIC_PACKAGES: \$\{\{ inputs\.mirror-public-packages \}\}/)
+})
