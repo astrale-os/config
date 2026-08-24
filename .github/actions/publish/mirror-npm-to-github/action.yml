@@ -1,0 +1,39 @@
+name: Mirror npm packages privately to GitHub Packages
+description: >
+  Mirror exact public npm tarballs to private GitHub Packages copies after npm
+  publication and qualification have completed.
+
+inputs:
+  dirs:
+    description: Space-separated package directories whose exact manifest versions are mirrored.
+    required: true
+  github-token:
+    description: Repository GITHUB_TOKEN with packages:write.
+    required: true
+  repository:
+    description: Owning GitHub repository in owner/name form.
+    required: true
+  node-version-file:
+    default: '.nvmrc'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+        package-manager-cache: false
+
+    - name: Pin npm
+      shell: bash
+      run: npm install -g npm@11.19.0
+
+    - name: Mirror exact npm artifacts
+      shell: bash
+      env:
+        MIRROR_DIRS: ${{ inputs.dirs }}
+        MIRROR_GITHUB_TOKEN: ${{ inputs.github-token }}
+        MIRROR_REPOSITORY: ${{ inputs.repository }}
+        MIRROR_GITHUB_API_URL: ${{ github.api_url }}
+      run: node "${{ github.action_path }}/mirror.mjs"

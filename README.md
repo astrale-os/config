@@ -65,7 +65,8 @@ Composite actions organized by category in `.github/actions/`.
 ├── ci/              # lint, typecheck, test, build
 ├── publish/
 │   ├── jsr/         # Publish to JSR
-│   └── npm/         # Publish to npm/GitHub Packages
+│   ├── npm/         # Publish to one npm-compatible registry
+│   └── mirror-npm-to-github/ # Mirror authoritative npm tarballs privately
 └── release/         # Release Please
 ```
 
@@ -157,6 +158,26 @@ jobs:
 | `scope`             | required                     | npm scope (e.g., `@astrale-os`) |
 | `access`            | `restricted`                 | Package access level            |
 | `token`             | required                     | npm registry token              |
+
+### publish/mirror-npm-to-github
+
+Mirror exact npm-published tarballs to private GitHub Packages copies after the authoritative npm
+release has been independently qualified. The action does not build, pack from source, install, or
+write to npm. Existing GitHub packages must already be private and linked to the named repository.
+
+```yaml
+permissions:
+  contents: read
+  packages: write
+
+steps:
+  - uses: actions/checkout@v4
+  - uses: astrale-os/config/.github/actions/publish/mirror-npm-to-github@<sha>
+    with:
+      dirs: '. adapter-cloudflare adapter-astrale'
+      github-token: ${{ github.token }}
+      repository: astrale-os/sdk
+```
 
 ### release
 
