@@ -440,7 +440,7 @@ test('leaves a partial secondary mirror retryable without touching npm', async (
   })
 })
 
-test('requires every existing package to be linked to the exact repository', async () => {
+test('rejects every API-exposed package link that is not the exact repository', async () => {
   await fixture(async ({ root, candidate, fake, request }) => {
     fake.metadata.get(candidate.slug).repository = { full_name: 'astrale-os/not-sdk' }
     await assert.rejects(
@@ -448,6 +448,51 @@ test('requires every existing package to be linked to the exact repository', asy
       /must be linked to astrale-os\/sdk/u,
     )
     assert.equal(fake.calls.length, 0)
+  })
+
+  await fixture(async ({ root, candidate, fake, request }) => {
+    fake.metadata.get(candidate.slug).repository = null
+    await assert.rejects(
+      mirrorPackages(input(root, [candidate.directory], fake.run, request)),
+      /must be linked to astrale-os\/sdk/u,
+    )
+    assert.equal(fake.calls.length, 0)
+  })
+})
+
+test('admits repository metadata omitted from a repository-scoped workflow token', async () => {
+  await fixture(async ({ root, candidate, fake, request }) => {
+    delete fake.metadata.get(candidate.slug).repository
+
+    await mirrorPackages(input(root, [candidate.directory], fake.run, request))
+
+    assert.equal(fake.publishCalls.length, 1)
+    assert.equal(fake.metadata.get(candidate.slug).visibility, 'private')
+    assert.equal(fake.npmPublicWrites, 0)
+  })
+})
+
+test('rejects an explicit link mismatch after an omitted preflight without reconciling tags', async () => {
+  await fixture(async ({ root, candidate, fake }) => {
+    const omitted = { ...fake.metadata.get(candidate.slug) }
+    delete omitted.repository
+    let requests = 0
+    const request = async () =>
+      response(
+        200,
+        requests++ === 0
+          ? omitted
+          : { ...omitted, repository: { full_name: 'astrale-os/not-sdk' } },
+      )
+
+    await assert.rejects(
+      mirrorPackages(input(root, [candidate.directory], fake.run, request)),
+      /must be linked to astrale-os\/sdk/u,
+    )
+
+    assert.equal(fake.publishCalls.length, 1)
+    assert.deepEqual(fake.tagAdds, [])
+    assert.equal(fake.npmPublicWrites, 0)
   })
 })
 

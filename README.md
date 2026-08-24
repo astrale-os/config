@@ -163,7 +163,18 @@ jobs:
 
 Mirror exact npm-published tarballs to private GitHub Packages copies after the authoritative npm
 release has been independently qualified. The action does not build, pack from source, install, or
-write to npm. Existing GitHub packages must already be private and linked to the named repository.
+write to npm. Existing GitHub packages must already be private, linked to the named repository, and
+grant that repository GitHub Actions access. GitHub omits the package `repository` field from a
+repository-scoped `GITHUB_TOKEN` response, so linkage is an operator-provisioned precondition rather
+than a claim made by the mirror run. The action continuously rejects any API-exposed mismatch and
+proves the exact released manifest repository, private target, artifact bytes, and release tags.
+
+Audit the provisioning with an owner token before enabling a mirror:
+
+```bash
+gh api orgs/astrale-os/packages/npm/sdk \
+  --jq '{visibility, repository: .repository.full_name}'
+```
 
 ```yaml
 permissions:
