@@ -129,6 +129,7 @@ async function runPublisher({ manifests, dirs, extraEnv = {} }) {
         PUBLISH_DIRS: dirs.join(' '),
         RUNNER_TEMP: runnerTemp,
         GH_PACKAGES_TOKEN: '',
+        MIRROR_PUBLIC_PACKAGES: 'true',
         NPM_TOKEN: '',
         FAKE_PUBLISH_LOG: publishLog,
         FAKE_TAG_COUNTER: join(root, 'tag-counter'),
@@ -368,6 +369,39 @@ test('fails missing required registry credentials before publishing anything', a
   assert.equal(result.status, 1)
   assert.deepEqual(result.calls, [])
   assert.match(result.output, /GitHub Packages token is required/)
+})
+
+test('publishes public scoped packages to npm without requiring the optional mirror', async () => {
+  const result = await runPublisher({
+    manifests: {
+      producer: { name: '@astrale-os/producer', version: '1.0.0' },
+      consumer: {
+        name: '@astrale-os/consumer',
+        version: '1.0.0',
+        dependencies: { '@astrale-os/producer': '^1.0.0' },
+      },
+    },
+    dirs: ['producer', 'consumer'],
+    extraEnv: { MIRROR_PUBLIC_PACKAGES: 'false' },
+  })
+
+  assert.equal(result.status, 0, result.output)
+  assert.equal(result.calls.length, 2)
+  assert.match(result.calls[0], /producer\.tgz --access public/)
+  assert.match(result.calls[1], /consumer\.tgz --access public/)
+  assert.doesNotMatch(result.output, /GitHub Packages token is required/)
+})
+
+test('rejects an invalid public mirror mode before publishing anything', async () => {
+  const result = await runPublisher({
+    manifests: { producer: npmPackages.producer },
+    dirs: ['producer'],
+    extraEnv: { MIRROR_PUBLIC_PACKAGES: 'sometimes' },
+  })
+
+  assert.equal(result.status, 1)
+  assert.deepEqual(result.calls, [])
+  assert.match(result.output, /MIRROR_PUBLIC_PACKAGES must be true or false/)
 })
 
 test('rejects a non-topological input before contacting a registry', async () => {

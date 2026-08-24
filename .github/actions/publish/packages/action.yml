@@ -14,7 +14,10 @@ inputs:
     required: true
   github-token:
     description: Token with packages:write (typically secrets.GITHUB_TOKEN).
-    required: true
+    default: ''
+  mirror-public-packages:
+    description: Mirror public @astrale-os packages to GitHub Packages in addition to npm.
+    default: 'true'
   node-version-file:
     default: '.nvmrc'
   build-command:
@@ -78,5 +81,6 @@ runs:
         PUBLISH_DIRS: ${{ inputs.dirs }}
         PUBLISH_ACTION_PATH: ${{ github.action_path }}
         GH_PACKAGES_TOKEN: ${{ inputs.github-token }}
+        MIRROR_PUBLIC_PACKAGES: ${{ inputs.mirror-public-packages }}
         PRERELEASE_TAG: ${{ inputs.prerelease-tag }}
       run: bash "${{ github.action_path }}/publish.sh"

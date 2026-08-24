@@ -11,7 +11,7 @@
 #   publishConfig.registry contains npm.pkg.github.com (case-insensitive)
 #     OR publishConfig.access === "restricted"      -> GitHub Packages ONLY (private)
 #   unscoped name (not @astrale-os/*)              -> npm ONLY (GH Packages can't host it)
-#   otherwise (scoped, public)                     -> BOTH
+#   otherwise (scoped, public)                     -> npm, plus the optional GitHub mirror
 #
 # AUTH: GitHub Packages uses the repo's own GITHUB_TOKEN (passed as GH_PACKAGES_TOKEN)
 # — each repo owns its own packages, so no PAT is needed. npm uses GitHub Actions
@@ -45,6 +45,11 @@ NPM_REG="https://registry.npmjs.org"
 : "${PUBLISH_DIRS:?set PUBLISH_DIRS}"
 : "${RUNNER_TEMP:=$(mktemp -d)}"
 GH_PACKAGES_TOKEN="${GH_PACKAGES_TOKEN:-}"
+MIRROR_PUBLIC_PACKAGES="${MIRROR_PUBLIC_PACKAGES:-true}"
+case "$MIRROR_PUBLIC_PACKAGES" in
+  true|false) ;;
+  *) echo "::error title=Publication stopped::MIRROR_PUBLIC_PACKAGES must be true or false" >&2; exit 1 ;;
+esac
 if [ -n "${NPM_TOKEN:-}" ] || [ -n "${NODE_AUTH_TOKEN:-}" ]; then
   echo "::error title=Publication stopped::npm token authentication is forbidden; use OIDC Trusted Publishing" >&2
   exit 1
@@ -75,11 +80,15 @@ decide() {
   access=$(node -p "require('./$dir/package.json').publishConfig?.access || ''" 2>/dev/null || echo '')
   gh=false; npm=false
   if [ "$private" != "true" ]; then
-    case "$name" in @astrale-os/*) gh=true ;; esac
     # GUARD: a GitHub-Packages registry OR access:restricted means private -> never npm.
     case "$reg" in
       *npm.pkg.github.com*) npm=false ;;
       *) [ "$access" = "restricted" ] && npm=false || npm=true ;;
+    esac
+    case "$name" in
+      @astrale-os/*)
+        if [ "$npm" = "true" ]; then gh="$MIRROR_PUBLIC_PACKAGES"; else gh=true; fi
+        ;;
     esac
   fi
   printf '%s %s' "$gh" "$npm"
