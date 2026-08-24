@@ -138,7 +138,10 @@ npm_tag_for() {
 # real workflows retry; tests override the attempts and delay to remain instant.
 verify_dist_tag() {
   local name="$1" version="$2" tag="$3" reg="$4" cfg="$5"
-  local attempts="${DIST_TAG_VERIFY_ATTEMPTS:-6}"
+  # npm can acknowledge a publish before the immutable version and its mutable
+  # channel tag are visible from every registry edge. Keep this verification
+  # fail-closed, but allow up to five minutes for normal propagation.
+  local attempts="${DIST_TAG_VERIFY_ATTEMPTS:-60}"
   local delay="${DIST_TAG_VERIFY_DELAY_SECONDS:-5}"
   local attempt=1 out code
 
