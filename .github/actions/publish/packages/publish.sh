@@ -177,23 +177,26 @@ verify_dist_tag() {
 }
 
 # Prove that an acknowledged immutable publication is fetchable through the
-# ordinary package-metadata endpoint before a dependent package or qualifier
-# starts. A mutable dist-tag can propagate ahead of this exact lookup.
+# workspace package manager before a dependent package or qualifier starts.
+# npm's mutable metadata can propagate ahead of pnpm's exact packument edge.
 verify_version() {
   local spec="$1" reg="$2" cfg="$3"
   local attempts="${VERSION_VERIFY_ATTEMPTS:-60}"
   local delay="${VERSION_VERIFY_DELAY_SECONDS:-5}"
-  local attempt=1 state
+  local attempt=1 out code
 
   while [ "$attempt" -le "$attempts" ]; do
-    exists_on "$spec" "$reg" "$cfg"; state=$?
-    [ "$state" = "0" ] && return 0
+    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$cfg" pnpm view "$spec" version --registry="$reg" 2>&1 ); code=$?
+    if [ "$code" = "0" ] && printf '%s\n' "$out" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]'; then
+      return 0
+    fi
     if [ "$attempt" -lt "$attempts" ]; then
       sleep "$delay"
     fi
     attempt=$((attempt + 1))
   done
 
+  echo "::warning::pnpm visibility check for $spec on $reg returned: $(compact "$out")" >&2
   return 1
 }
 
