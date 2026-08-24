@@ -7,6 +7,12 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const publisher = fileURLToPath(new URL('./publish.sh', import.meta.url))
+const publisherSource = await readFile(publisher, 'utf8')
+
+test('allows five minutes for registry dist-tag propagation by default', () => {
+  assert.match(publisherSource, /DIST_TAG_VERIFY_ATTEMPTS:-60/)
+  assert.match(publisherSource, /DIST_TAG_VERIFY_DELAY_SECONDS:-5/)
+})
 
 const npmStub = [
   '#!/usr/bin/env bash',
@@ -32,6 +38,13 @@ const npmStub = [
   '  dist-tag)',
   '    [ "${2:-}" = ls ] || { echo "unexpected npm dist-tag command: $*" >&2; exit 9; }',
   '    name="${3:-}"',
+  '    if [ -n "${FAKE_TAG_COUNTER:-}" ]; then',
+  '      count=0',
+  '      [ ! -f "$FAKE_TAG_COUNTER" ] || read -r count < "$FAKE_TAG_COUNTER"',
+  '      count=$((count + 1))',
+  '      printf "%s\\n" "$count" > "$FAKE_TAG_COUNTER"',
+  '      [ "$count" -gt "${FAKE_TAG_DELAY_CALLS:-0}" ] || exit 0',
+  '    fi',
   '    IFS=, read -r -a tags <<< "${FAKE_TAGS:-}"',
   '    for entry in "${tags[@]}"; do',
   '      if [[ "$entry" == "$name|"*"="* ]]; then',
@@ -111,6 +124,7 @@ async function runPublisher({ manifests, dirs, extraEnv = {} }) {
         GH_PACKAGES_TOKEN: '',
         NPM_TOKEN: '',
         FAKE_PUBLISH_LOG: publishLog,
+        FAKE_TAG_COUNTER: join(root, 'tag-counter'),
         FAKE_TAGS: fakeTags,
         DIST_TAG_VERIFY_ATTEMPTS: '1',
         DIST_TAG_VERIFY_DELAY_SECONDS: '0',
@@ -162,6 +176,21 @@ test('publishes producers and consumers sequentially on success', async () => {
   assert.equal(result.calls.length, 2)
   assert.match(result.calls[0], /producer\.tgz/)
   assert.match(result.calls[1], /consumer\.tgz/)
+})
+
+test('waits for a published dist-tag to propagate before continuing', async () => {
+  const result = await runPublisher({
+    manifests: { producer: npmPackages.producer },
+    dirs: ['producer'],
+    extraEnv: {
+      DIST_TAG_VERIFY_ATTEMPTS: '3',
+      DIST_TAG_VERIFY_DELAY_SECONDS: '0',
+      FAKE_TAG_DELAY_CALLS: '2',
+    },
+  })
+
+  assert.equal(result.status, 0, result.output)
+  assert.equal(result.calls.length, 1)
 })
 
 test('stops on an inconclusive producer lookup', async () => {
