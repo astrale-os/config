@@ -1,6 +1,11 @@
 packages:
   - 'packages/*'
 
+# Local integration uses the checked-out @astrale-os/ox package. Registry-only
+# qualification belongs to consuming repositories, not this source workspace.
+linkWorkspacePackages: true
+preferWorkspacePackages: true
+
 # Block packages released < 7 days ago (10080 minutes) — supply-chain hardening.
 minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true

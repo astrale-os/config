@@ -6,6 +6,3 @@ coverage
 
 # Cloudflare Workers
 .dev.vars
-
-# Lockfile (generated fresh in CI)
-pnpm-lock.yaml
