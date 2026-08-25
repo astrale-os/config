@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.5](https://github.com/astrale-os/config/compare/commitlint-config-v2.0.4...commitlint-config-v2.0.5) (2026-08-25)
+
+
+### Bug Fixes
+
+* **commitlint:** raise header-max-length from 72 to 100 ([270fcee](https://github.com/astrale-os/config/commit/270fcee63e19a25e8e7f0649b5018dd00e48aff3))
+
 ## [2.0.4](https://github.com/astrale-os/config/compare/commitlint-config-v2.0.3...commitlint-config-v2.0.4) (2026-08-23)
 
 
