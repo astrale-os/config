@@ -40,6 +40,7 @@ export async function mirrorPackages({
   const root = await mkdtemp(join(runnerTemp ?? tmpdir(), 'astrale-npm-mirror-'))
   const npmConfig = join(root, 'npm.npmrc')
   const githubConfig = join(root, 'github.npmrc')
+  const runIsolated = (command, args, options = {}) => run(command, args, { ...options, cwd: root })
   const commandEnvironment = { ...environment }
   delete commandEnvironment.NPM_TOKEN
   delete commandEnvironment.NODE_AUTH_TOKEN
@@ -84,7 +85,7 @@ export async function mirrorPackages({
       candidate.targetVersion = registryVersion(
         candidate,
         githubConfig,
-        run,
+        runIsolated,
         githubCommandEnvironment,
         githubToken,
       )
@@ -99,7 +100,7 @@ export async function mirrorPackages({
         candidate,
         root,
         npmConfig,
-        run,
+        run: runIsolated,
         commandEnvironment,
         githubToken,
       })
@@ -114,7 +115,7 @@ export async function mirrorPackages({
         githubToken,
         githubConfig,
         root,
-        run,
+        run: runIsolated,
         request,
         wait,
         attempts,

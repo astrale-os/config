@@ -85,6 +85,8 @@ test('mirrors one exact npm tarball, repairs its tag, and proves private reposit
         )
         assert.doesNotMatch(config.contents, /_authToken/u)
       }
+      assert.equal(config.cwd, dirname(config.path))
+      assert.notEqual(config.cwd, root)
     }
     assert.equal(
       fake.configUses.every(({ mode }) => mode === 0o600),
@@ -661,6 +663,7 @@ function fakeBoundary(candidates) {
       path: configPath,
       contents: readFileSync(configPath, 'utf8'),
       mode: statSync(configPath).mode & 0o777,
+      cwd: options.cwd,
     }
     configUses.push(config)
     commandEnvironments.push(options.env)
