@@ -16,14 +16,17 @@
     "lint:fix": "oxlint --fix .",
     "format": "pnpm exec oxfmt --write .",
     "format:check": "pnpm exec oxfmt --check .",
-    "test": "pnpm test:action-pins && pnpm test:action-defaults && pnpm test:install-boundary && pnpm test:domains && pnpm test:jsr-publish && pnpm test:publish-packages && pnpm test:publish-mirror && pnpm -r --if-present run test",
+    "test": "pnpm test:action-pins && pnpm test:action-defaults && pnpm test:install-boundary && pnpm test:domains && pnpm test:github && pnpm test:jsr-publish && pnpm test:publish-packages && pnpm test:publish-mirror && pnpm -r --if-present run test",
     "test:action-pins": "node --test .github/actions/action-pins.test.mjs",
     "test:action-defaults": "node --test .github/actions/frozen-lockfile-defaults.test.mjs",
     "test:install-boundary": "node --test .github/actions/install-dependencies.test.mjs",
     "test:domains": "node --test .github/actions/domains/*.test.mjs",
+    "test:github": "node --test github/repository-policy/*.test.mjs",
     "test:jsr-publish": "node --test .github/actions/publish/jsr/check-published.test.mjs",
     "test:publish-packages": "node --test .github/actions/publish/packages/*.test.mjs",
     "test:publish-mirror": "node --test .github/actions/publish/mirror-npm-to-github/*.test.mjs",
+    "github:repositories:check": "node github/repository-policy/reconcile.mjs --check",
+    "github:repositories:apply": "node github/repository-policy/reconcile.mjs --apply",
     "prepare": "husky"
   },
   "devDependencies": {

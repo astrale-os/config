@@ -1,0 +1,12 @@
+{
+  "organization": "astrale-os",
+  "repositories": ["cli", "config", "datastore", "domains", "gui", "kernel", "sdk", "shell", "ui"],
+  "settings": {
+    "allow_merge_commit": false,
+    "allow_rebase_merge": false,
+    "allow_squash_merge": true,
+    "squash_merge_commit_title": "PR_TITLE",
+    "squash_merge_commit_message": "BLANK",
+    "delete_branch_on_merge": true
+  }
+}

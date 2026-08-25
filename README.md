@@ -2,6 +2,9 @@
 
 Shared configurations and composite actions for Astrale TypeScript monorepos.
 
+Repository-level GitHub merge policy is declared and reconciled from
+[`github/repository-policy`](github/repository-policy/README.md).
+
 ## Packages
 
 | Package                      | JSR                                                                                                   | Description                 |
