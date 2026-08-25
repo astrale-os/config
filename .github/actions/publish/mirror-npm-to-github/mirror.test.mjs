@@ -138,7 +138,7 @@ test('redacts complete publish output before retaining its diagnostic tail', asy
   await fixture(async ({ root, candidate, fake, request }) => {
     fake.metadataMissing.add(candidate.slug)
     fake.githubPack404s = 1
-    fake.publishOutput = `${'x'.repeat(100)}${TOKEN}${'y'.repeat(2_000)}tail-marker`
+    fake.publishOutput = `${'x'.repeat(100)}${TOKEN}${'y'.repeat(484)}tail-marker`
 
     await assert.rejects(
       mirrorPackages({
@@ -147,7 +147,7 @@ test('redacts complete publish output before retaining its diagnostic tail', asy
       }),
       (error) => {
         assert.match(error.message, /tail-marker/u)
-        assert.doesNotMatch(error.message, new RegExp(TOKEN.slice(-8), 'u'))
+        assert.doesNotMatch(error.message, new RegExp(TOKEN.slice(-5), 'u'))
         return true
       },
     )
