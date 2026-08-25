@@ -1,0 +1,46 @@
+name: Publish Domain contracts
+description: Qualify selected Domain contracts, publish through npm OIDC, and prove registry consumers.
+
+inputs:
+  root:
+    default: .
+  repository:
+    default: ${{ github.repository }}
+  selection:
+    default: changed
+  before:
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare and qualify selected contracts
+      id: contracts
+      uses: $/.github/actions/domain-contracts/qualify
+      with:
+        root: ${{ inputs.root }}
+        repository: ${{ inputs.repository }}
+        selection: ${{ inputs.selection }}
+        before: ${{ inputs.before }}
+
+    - name: Publish selected contracts
+      if: steps.contracts.outputs.has-selected == 'true'
+      uses: $/.github/actions/publish/packages
+      with:
+        dirs: ${{ steps.contracts.outputs.dirs }}
+        mirror-public-packages: 'false'
+        install-command: 'true'
+        build-command: 'true'
+        tarballs-json: ${{ steps.contracts.outputs.tarballs }}
+
+    - name: Prove published contracts from npm
+      if: steps.contracts.outputs.has-selected == 'true'
+      shell: bash
+      env:
+        INPUT_ROOT: ${{ inputs.root }}
+        INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_SELECTION: ${{ inputs.selection }}
+        INPUT_BEFORE: ${{ inputs.before }}
+        NODE_AUTH_TOKEN: ''
+        NPM_TOKEN: ''
+      run: node "${{ github.action_path }}/../registry.mjs"

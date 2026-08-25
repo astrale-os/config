@@ -28,7 +28,7 @@ test('executable remote actions use immutable commit SHAs', async () => {
 
       for (const [index, line] of lines.entries()) {
         const reference = line.match(/^\s*(?:-\s*)?uses:\s*([^\s#]+)/)?.[1]
-        if (!reference || reference.startsWith('./')) continue
+        if (!reference || reference.startsWith('./') || reference.startsWith('$/')) continue
 
         const separator = reference.lastIndexOf('@')
         const revision = separator === -1 ? '' : reference.slice(separator + 1)

@@ -1,0 +1,47 @@
+name: Qualify Domain contracts
+description: Discover, pack, inspect, and clean-install every public Domain contract.
+
+inputs:
+  root:
+    default: .
+  repository:
+    default: ${{ github.repository }}
+  selection:
+    default: all
+  before:
+    default: ''
+  output-directory:
+    default: ${{ runner.temp }}/domain-contracts
+
+outputs:
+  plan:
+    value: ${{ steps.qualify.outputs.plan }}
+  dirs:
+    value: ${{ steps.qualify.outputs.dirs }}
+  has-selected:
+    value: ${{ steps.qualify.outputs.has-selected }}
+  tarballs:
+    value: ${{ steps.qualify.outputs.tarballs }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+
+    - name: Setup Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      with:
+        node-version-file: .nvmrc
+        package-manager-cache: false
+
+    - name: Qualify contract packages
+      id: qualify
+      shell: bash
+      env:
+        INPUT_ROOT: ${{ inputs.root }}
+        INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_SELECTION: ${{ inputs.selection }}
+        INPUT_BEFORE: ${{ inputs.before }}
+        INPUT_OUTPUT_DIRECTORY: ${{ inputs.output-directory }}
+      run: node "${{ github.action_path }}/../qualify.mjs"

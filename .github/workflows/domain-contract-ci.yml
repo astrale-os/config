@@ -1,0 +1,20 @@
+name: Domain contract CI
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  domain-contracts:
+    name: Domain contract packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout caller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Qualify discovered contracts
+        uses: $/.github/actions/domain-contracts/qualify

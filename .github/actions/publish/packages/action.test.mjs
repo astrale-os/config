@@ -57,4 +57,6 @@ test('exposes OIDC and registry credentials only to the publish step', () => {
   assert.notEqual(publishStart, -1, 'Publish step is missing')
   const publish = action.slice(publishStart)
   assert.doesNotMatch(publish, /ACTIONS_ID_TOKEN_REQUEST_(?:TOKEN|URL): ''/u)
+  assert.match(publish, /GH_PACKAGES_TOKEN: \$\{\{ inputs\.github-token \}\}/u)
+  assert.match(publish, /PUBLISH_TARBALLS_JSON: \$\{\{ inputs\.tarballs-json \}\}/u)
 })

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -88,6 +88,7 @@ const npmStub = [
   '    fi',
   '    tarball="${2:-}"',
   '    slug="$(basename "$tarball" .tgz)"',
+  '    slug="${slug%-prepared}"',
   '    registry=npm',
   '    [[ "$*" != *npm.pkg.github.com* ]] || registry=gh',
   '    : > "$FAKE_PUBLISHED_DIR/$slug.$registry"',
@@ -138,7 +139,7 @@ const pnpmStub = [
   '',
 ].join('\n')
 
-async function runPublisher({ manifests, dirs, extraEnv = {} }) {
+async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }) {
   const root = await mkdtemp(join(tmpdir(), 'astrale-publisher-test-'))
   const fakeBin = join(root, 'bin')
   const runnerTemp = join(root, 'runner')
@@ -166,6 +167,23 @@ async function runPublisher({ manifests, dirs, extraEnv = {} }) {
       })
       .join(',')
 
+    const tarballs = {}
+    if (prebuilt) {
+      for (const dir of dirs) {
+        const packageRoot = join(runnerTemp, `${dir}-archive`, 'package')
+        await mkdir(packageRoot, { recursive: true })
+        await writeFile(join(packageRoot, 'package.json'), JSON.stringify(manifests[dir]))
+        const path = join(runnerTemp, `${dir}-prepared.tgz`)
+        execFileSync('tar', ['-czf', path, 'package'], { cwd: join(runnerTemp, `${dir}-archive`) })
+        tarballs[dir] = path
+      }
+      if (prebuilt === 'swapped' && dirs.length === 2) {
+        const first = tarballs[dirs[0]]
+        tarballs[dirs[0]] = tarballs[dirs[1]]
+        tarballs[dirs[1]] = first
+      }
+    }
+
     const result = spawnSync('bash', [publisher], {
       cwd: root,
       encoding: 'utf8',
@@ -185,6 +203,7 @@ async function runPublisher({ manifests, dirs, extraEnv = {} }) {
         VERSION_VERIFY_DELAY_SECONDS: '0',
         DIST_TAG_VERIFY_ATTEMPTS: '1',
         DIST_TAG_VERIFY_DELAY_SECONDS: '0',
+        PUBLISH_TARBALLS_JSON: JSON.stringify(tarballs),
         ...extraEnv,
       },
     })
@@ -233,6 +252,30 @@ test('publishes producers and consumers sequentially on success', async () => {
   assert.equal(result.calls.length, 2)
   assert.match(result.calls[0], /producer\.tgz/)
   assert.match(result.calls[1], /consumer\.tgz/)
+})
+
+test('publishes the exact prebuilt tarballs supplied by an owning qualifier', async () => {
+  const result = await runPublisher({
+    manifests: npmPackages,
+    dirs: ['producer', 'consumer'],
+    prebuilt: true,
+  })
+
+  assert.equal(result.status, 0, result.output)
+  assert.match(result.calls[0], /producer-prepared\.tgz/u)
+  assert.match(result.calls[1], /consumer-prepared\.tgz/u)
+})
+
+test('rejects a swapped prebuilt tarball before registry mutation', async () => {
+  const result = await runPublisher({
+    manifests: npmPackages,
+    dirs: ['producer', 'consumer'],
+    prebuilt: 'swapped',
+  })
+
+  assert.equal(result.status, 1)
+  assert.deepEqual(result.calls, [])
+  assert.match(result.output, /Prepared tarball identity for producer is consumer@1\.0\.0/u)
 })
 
 test('rejects an ambient npm token instead of using it as a fallback', async () => {
