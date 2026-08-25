@@ -5,23 +5,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import {
-  classifyRegistryRead,
-  overrideForDependencies,
-  qualifyDomainContracts,
-} from './qualify.mjs'
+import { classifyRegistryRead, overrideForDependencies, qualifyDomains } from './qualify.mjs'
 
-async function contract(root, dir, name, dependencies = {}) {
+async function domain(root, dir, name, dependencies = {}, additional = {}) {
   const project = join(root, dir)
-  await mkdir(join(project, 'schema'), { recursive: true })
+  await mkdir(project, { recursive: true })
   await writeFile(join(project, 'astrale.config.ts'), 'export default {}\n')
-  await writeFile(join(project, 'schema', 'index.ts'), 'export const schema = {}\n')
   await writeFile(
     join(project, 'prepare.mjs'),
     `import { mkdir, writeFile } from 'node:fs/promises'
-await mkdir('dist/schema', { recursive: true })
-await writeFile('dist/schema/index.js', 'export const schema = {}\\n')
-await writeFile('dist/schema/index.d.ts', 'export declare const schema: {}\\n')
+await mkdir('lib', { recursive: true })
+await writeFile('lib/index.js', 'export const value = 1\\n')
 `,
   )
   await writeFile(
@@ -31,23 +25,14 @@ await writeFile('dist/schema/index.d.ts', 'export declare const schema: {}\\n')
         name,
         version: '1.0.0',
         type: 'module',
-        files: ['dist'],
-        main: './schema/index.ts',
-        types: './schema/index.ts',
-        exports: {
-          '.': { types: './schema/index.ts', import: './schema/index.ts' },
-          './package.json': './package.json',
-        },
+        files: ['lib'],
+        exports: './lib/index.js',
         publishConfig: {
-          main: './dist/schema/index.js',
-          types: './dist/schema/index.d.ts',
-          exports: {
-            '.': { types: './dist/schema/index.d.ts', import: './dist/schema/index.js' },
-            './package.json': './package.json',
-          },
+          exports: './lib/index.js',
         },
         scripts: { prepack: 'node prepare.mjs' },
         dependencies,
+        ...additional,
         packageManager: 'pnpm@11.13.1',
       },
       null,
@@ -56,10 +41,16 @@ await writeFile('dist/schema/index.d.ts', 'export declare const schema: {}\\n')
   )
 }
 
+function packedManifest(tarball) {
+  return JSON.parse(
+    execFileSync('tar', ['-xOf', tarball, 'package/package.json'], { encoding: 'utf8' }),
+  )
+}
+
 async function repository() {
   const root = await mkdtemp(join(tmpdir(), 'domain-qualification-'))
-  await contract(root, 'producer', '@example/producer')
-  await contract(root, 'consumer', '@example/consumer', { '@example/producer': '^1.0.0' })
+  await domain(root, 'producer', '@example/producer')
+  await domain(root, 'consumer', '@example/consumer', { '@example/producer': '^1.0.0' })
   await writeFile(
     join(root, '.release-please-config.json'),
     '{"packages":{"producer":{},"consumer":{}}}\n',
@@ -79,7 +70,7 @@ async function repository() {
 test('packs in derived order with an absent producer tarball', async () => {
   const root = await repository()
   const lookups = []
-  const result = await qualifyDomainContracts({
+  const result = await qualifyDomains({
     root,
     registryLookup: async ({ name }) => {
       lookups.push(name)
@@ -147,6 +138,65 @@ test('substitutes only absent internal dependencies', async () => {
   )
 })
 
+test('keeps qualifier tarball paths out of every packed dependency field', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'domain-restoration-'))
+  await domain(root, 'producer', '@example/producer')
+  await domain(root, 'required', '@example/required', { '@example/producer': '^1.0.0' })
+  await domain(
+    root,
+    'optional',
+    '@example/optional',
+    {},
+    {
+      optionalDependencies: { '@example/producer': '~1.0.0' },
+    },
+  )
+  await domain(
+    root,
+    'peer',
+    '@example/peer',
+    {},
+    {
+      peerDependencies: { '@example/producer': '>=1.0.0 <2.0.0' },
+    },
+  )
+  await writeFile(
+    join(root, '.release-please-config.json'),
+    '{"packages":{"producer":{},"required":{},"optional":{},"peer":{}}}\n',
+  )
+  await writeFile(
+    join(root, '.release-please-manifest.json'),
+    '{"producer":"1.0.0","required":"1.0.0","optional":"1.0.0","peer":"1.0.0"}\n',
+  )
+  execFileSync('git', ['init', '-q'], { cwd: root })
+  execFileSync('git', ['config', 'user.email', 'tests@astrale.ai'], { cwd: root })
+  execFileSync('git', ['config', 'user.name', 'Astrale tests'], { cwd: root })
+  execFileSync('git', ['add', '.'], { cwd: root })
+  execFileSync('git', ['commit', '-qm', 'fixture'], { cwd: root })
+
+  const result = await qualifyDomains({ root, registryLookup: async () => 'absent' })
+  const required = packedManifest(result.tarballs.required)
+  const optional = packedManifest(result.tarballs.optional)
+  const peer = packedManifest(result.tarballs.peer)
+  assert.equal(required.dependencies['@example/producer'], '^1.0.0')
+  assert.equal(optional.optionalDependencies['@example/producer'], '~1.0.0')
+  assert.equal(peer.peerDependencies['@example/producer'], '>=1.0.0 <2.0.0')
+  assert.doesNotMatch(JSON.stringify({ required, optional, peer }), /file:/u)
+})
+
+test('does not execute package-owned install lifecycle scripts during qualification', async () => {
+  const root = await repository()
+  const path = join(root, 'producer', 'package.json')
+  const manifest = JSON.parse(await (await import('node:fs/promises')).readFile(path, 'utf8'))
+  manifest.scripts.postinstall = 'node -e "process.exit(97)"'
+  await writeFile(path, `${JSON.stringify(manifest)}\n`)
+  execFileSync('git', ['add', '.'], { cwd: root })
+  execFileSync('git', ['commit', '-qm', 'install lifecycle trap'], { cwd: root })
+
+  const result = await qualifyDomains({ root, registryLookup: async () => 'absent' })
+  assert.deepEqual(Object.keys(result.tarballs), ['producer', 'consumer'])
+})
+
 test('rejects an incompatible selected producer version before installation', async () => {
   const root = await repository()
   const path = join(root, 'consumer', 'package.json')
@@ -156,27 +206,26 @@ test('rejects an incompatible selected producer version before installation', as
   execFileSync('git', ['add', '.'], { cwd: root })
   execFileSync('git', ['commit', '-qm', 'incompatible'], { cwd: root })
   await assert.rejects(
-    qualifyDomainContracts({ root, registryLookup: async () => 'absent' }),
+    qualifyDomains({ root, registryLookup: async () => 'absent' }),
     /does not admit selected 1\.0\.0/u,
   )
 })
 
-test('rejects a tarball whose published declarations fail in a clean consumer', async () => {
+test('rejects a Domain whose packed root fails in a clean consumer', async () => {
   const root = await repository()
   await writeFile(
     join(root, 'producer', 'prepare.mjs'),
     `import { mkdir, writeFile } from 'node:fs/promises'
-await mkdir('dist/schema', { recursive: true })
-await writeFile('dist/schema/index.js', 'export const schema = {}\\n')
-await writeFile('dist/schema/index.d.ts', "export { Missing } from 'missing-package'\\nexport declare const schema: {}\\n")
+await mkdir('lib', { recursive: true })
+await writeFile('lib/index.js', "export { missing } from 'missing-package'\\n")
 `,
   )
   execFileSync('git', ['add', '.'], { cwd: root })
   execFileSync('git', ['commit', '-qm', 'break published declarations'], { cwd: root })
 
   await assert.rejects(
-    qualifyDomainContracts({ root, registryLookup: async () => 'absent' }),
-    /Cannot find module 'missing-package'/u,
+    qualifyDomains({ root, registryLookup: async () => 'absent' }),
+    /Cannot find package 'missing-package'/u,
   )
 })
 

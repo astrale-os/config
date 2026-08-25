@@ -1,4 +1,4 @@
-name: Publish Domain contracts
+name: Publish Domains
 
 on:
   workflow_call:
@@ -8,12 +8,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: domain-contract-publish-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: false
+  group: domains-publish-${{ github.repository }}
+  queue: max
 
 jobs:
-  publish-domain-contracts:
-    name: Publish Domain contract packages
+  publish-domains:
+    name: Publish Domains
     runs-on: ubuntu-latest
     steps:
       - name: Checkout caller
@@ -21,8 +21,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Publish discovered contracts
-        uses: $/.github/actions/domain-contracts/publish
+      - name: Publish discovered Domains
+        uses: $/.github/actions/domains/publish
         with:
           selection: ${{ github.event_name == 'workflow_dispatch' && 'all' || 'changed' }}
           before: ${{ github.event.before }}

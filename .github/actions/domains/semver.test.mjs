@@ -13,6 +13,12 @@ test('supports ordinary exact, caret, tilde, comparator, wildcard, and union ran
   assert.equal(satisfies('1.3.0', '~1.2.3'), false)
   assert.equal(satisfies('1.5.0', '>=1.2.0 <2.0.0'), true)
   assert.equal(satisfies('2.1.0', '1.x || >=2.1.0 <3'), true)
+  assert.equal(satisfies('1.2.1', '>1.2'), false)
+  assert.equal(satisfies('1.3.0', '>1.2'), true)
+  assert.equal(satisfies('1.2.5', '<=1.2'), true)
+  assert.equal(satisfies('1.3.0', '<=1.2'), false)
+  assert.equal(satisfies('2.3.9', '1.2.3 - 2.3'), true)
+  assert.equal(satisfies('2.4.0', '1.2.3 - 2.3'), false)
 })
 
 test('admits prereleases only when the comparator set names the same release tuple', () => {

@@ -12,10 +12,10 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { CONSUMER_PROBE, writeContractConsumer } from './consumer.mjs'
-import { discoverDomainContracts } from './discovery.mjs'
+import { CONSUMER_PROBE, writeDomainConsumer } from './consumer.mjs'
+import { discoverDomains } from './discovery.mjs'
 import { satisfies } from './semver.mjs'
-import { inspectContractTarball } from './tarball.mjs'
+import { inspectDomainTarball } from './tarball.mjs'
 
 const DEPENDENCY_FIELDS = ['dependencies', 'optionalDependencies', 'peerDependencies']
 
@@ -126,9 +126,17 @@ async function temporaryDependencyTarballs(project, overrides) {
   const path = join(project, 'package.json')
   const original = await readFile(path, 'utf8')
   const manifest = JSON.parse(original)
-  for (const field of DEPENDENCY_FIELDS) {
-    for (const name of Object.keys(manifest[field] ?? {})) {
-      if (overrides[name]) manifest[field][name] = overrides[name]
+  for (const [name, tarball] of Object.entries(overrides)) {
+    let direct = false
+    for (const field of ['dependencies', 'optionalDependencies']) {
+      if (manifest[field]?.[name] !== undefined) {
+        manifest[field][name] = tarball
+        direct = true
+      }
+    }
+    if (!direct && manifest.peerDependencies?.[name] !== undefined) {
+      manifest.devDependencies ??= {}
+      manifest.devDependencies[name] = tarball
     }
   }
   await writeFile(path, `${JSON.stringify(manifest, null, 2)}\n`)
@@ -163,7 +171,7 @@ async function proveConsumer({
     cwd: consumer,
     env,
   })
-  await writeContractConsumer({
+  await writeDomainConsumer({
     directory: consumer,
     name: pkg.name,
     dependency: `file:${tarball}`,
@@ -179,12 +187,10 @@ async function proveConsumer({
     env,
     quiet: true,
   })
-  run('pnpm', ['exec', 'tsc', '--noEmit'], { cwd: consumer, env, quiet: true })
 }
 
-export async function qualifyDomainContracts({
+export async function qualifyDomains({
   root = process.cwd(),
-  repository = '',
   selection = 'all',
   before = '',
   outputDirectory,
@@ -192,7 +198,7 @@ export async function qualifyDomainContracts({
   registryLookup = defaultRegistryLookup,
 } = {}) {
   const absoluteRoot = resolve(root)
-  const plan = await discoverDomainContracts({ root: absoluteRoot, repository, selection, before })
+  const plan = await discoverDomains({ root: absoluteRoot, selection, before })
   const selectedNames = new Set(plan.selected.map(({ name }) => name))
   const discoveredByDirectory = new Map()
   for (const pkg of plan.packages) {
@@ -212,16 +218,13 @@ export async function qualifyDomainContracts({
     .filter(({ name }) => selectedNames.has(name))
     .map(({ dir }) => discoveredByDirectory.get(dir))
   const allByName = new Map([...discoveredByDirectory.values()].map((pkg) => [pkg.name, pkg]))
-  const output = resolve(outputDirectory ?? (await mkdtemp(join(tmpdir(), 'domain-contracts-'))))
+  const output = resolve(outputDirectory ?? (await mkdtemp(join(tmpdir(), 'domains-'))))
   const projects = join(output, 'projects')
   const packs = join(output, 'packs')
   await mkdir(projects, { recursive: true })
   await mkdir(packs, { recursive: true })
   const npmrc = join(output, 'npmrc')
-  await writeFile(
-    npmrc,
-    `registry=${registry}\n@astrale-os:registry=${registry}\n@astrale-domains:registry=${registry}\n`,
-  )
+  await writeFile(npmrc, `registry=${registry}\n`)
   const env = {
     NPM_CONFIG_USERCONFIG: npmrc,
     NPM_CONFIG_REGISTRY: registry,
@@ -262,7 +265,7 @@ export async function qualifyDomainContracts({
     await mkdir(packDirectory, { recursive: true })
     run('pnpm', ['pack', '--pack-destination', packDirectory], { cwd: project, env, quiet: true })
     const tarball = await packedTarball(packDirectory)
-    inspectContractTarball(tarball, pkg)
+    inspectDomainTarball(tarball, pkg)
     tarballsByName.set(pkg.name, tarball)
     tarballsByDirectory[pkg.directory] = tarball
     await proveConsumer({
@@ -287,9 +290,8 @@ async function writeOutput(name, value) {
 }
 
 async function main() {
-  const result = await qualifyDomainContracts({
+  const result = await qualifyDomains({
     root: process.env.INPUT_ROOT || process.cwd(),
-    repository: process.env.INPUT_REPOSITORY || process.env.GITHUB_REPOSITORY || '',
     selection: process.env.INPUT_SELECTION || 'all',
     before: process.env.INPUT_BEFORE || '',
     outputDirectory: process.env.INPUT_OUTPUT_DIRECTORY || undefined,
@@ -298,12 +300,12 @@ async function main() {
   await writeOutput('dirs', result.plan.selectedDirectories.join(' '))
   await writeOutput('has-selected', result.plan.selected.length > 0)
   await writeOutput('tarballs', result.tarballs)
-  console.log(`Qualified ${result.plan.selected.length} Domain contract package(s)`)
+  console.log(`Qualified ${result.plan.selected.length} Domain package(s)`)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch((error) => {
-    console.error(`::error title=Domain contract qualification failed::${error.message}`)
+    console.error(`::error title=Domain qualification failed::${error.message}`)
     process.exitCode = 1
   })
 }

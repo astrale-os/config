@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { appendFile, readFile } from 'node:fs/promises'
-import { basename, dirname, posix, resolve } from 'node:path'
+import { dirname, posix, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const DEPENDENCY_FIELDS = ['dependencies', 'optionalDependencies', 'peerDependencies']
@@ -78,7 +78,7 @@ export function topologicalOrder(packages) {
       .filter((pkg) => dependencies.get(pkg.name).size > 0)
       .map((pkg) => `${pkg.name} -> ${[...dependencies.get(pkg.name)].sort().join(', ')}`)
       .sort()
-    throw new Error(`Domain contract dependency cycle:\n- ${cycle.join('\n- ')}`)
+    throw new Error(`Domain dependency cycle:\n- ${cycle.join('\n- ')}`)
   }
   return ordered
 }
@@ -94,14 +94,13 @@ function previousVersion(root, before, directory) {
   }
 }
 
-export async function discoverDomainContracts({
+export async function discoverDomains({
   root = process.cwd(),
-  repository = '',
   selection = 'all',
   before = '',
 } = {}) {
   if (!['all', 'changed', 'none'].includes(selection)) {
-    throw new Error(`Unknown Domain contract selection: ${selection}`)
+    throw new Error(`Unknown Domain selection: ${selection}`)
   }
 
   const absoluteRoot = resolve(root)
@@ -127,14 +126,6 @@ export async function discoverDomainContracts({
     }
     if (typeof manifest.version !== 'string' || manifest.version.length === 0) {
       throw new Error(`Public Domain ${directory} has no package version`)
-    }
-    if (repository === 'astrale-os/domains') {
-      const expected = `@astrale-domains/${basename(directory)}`
-      if (manifest.name !== expected) {
-        throw new Error(
-          `First-party Domain ${directory} must be named ${expected}; found ${manifest.name}`,
-        )
-      }
     }
     candidates.push({ directory, name: manifest.name, version: manifest.version, manifest })
   }
@@ -207,9 +198,8 @@ async function writeOutput(name, value) {
 }
 
 async function main() {
-  const plan = await discoverDomainContracts({
+  const plan = await discoverDomains({
     root: process.env.INPUT_ROOT || process.cwd(),
-    repository: process.env.INPUT_REPOSITORY || process.env.GITHUB_REPOSITORY || '',
     selection: process.env.INPUT_SELECTION || 'all',
     before: process.env.INPUT_BEFORE || '',
   })
@@ -222,7 +212,7 @@ async function main() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch((error) => {
-    console.error(`::error title=Domain contract discovery failed::${error.message}`)
+    console.error(`::error title=Domain discovery failed::${error.message}`)
     process.exitCode = 1
   })
 }

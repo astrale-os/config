@@ -1,4 +1,4 @@
-name: Domain contract CI
+name: Domains CI
 
 on:
   workflow_call:
@@ -7,8 +7,8 @@ permissions:
   contents: read
 
 jobs:
-  domain-contracts:
-    name: Domain contract packages
+  domains:
+    name: Domains
     runs-on: ubuntu-latest
     steps:
       - name: Checkout caller
@@ -16,5 +16,5 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Qualify discovered contracts
-        uses: $/.github/actions/domain-contracts/qualify
+      - name: Qualify discovered Domains
+        uses: $/.github/actions/domains/qualify

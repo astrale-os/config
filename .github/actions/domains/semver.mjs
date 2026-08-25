@@ -69,12 +69,16 @@ function tokenPredicates(token) {
     if (!Number.isInteger(major) || !Number.isInteger(minor))
       throw new Error(`Invalid range: ${token}`)
     const lower = tuple(major, minor, 0)
-    if (['>', '>=', '<', '<='].includes(operator)) return [comparator(operator, lower)]
-    if (operator === '^') {
-      const upper = major > 0 ? tuple(major + 1) : minor > 0 ? tuple(0, minor + 1) : tuple(0, 0, 1)
-      return [comparator('>=', lower), comparator('<', upper)]
-    }
     const upper = partial <= 1 ? tuple(major + 1) : tuple(major, minor + 1)
+    if (operator === '>') return [comparator('>=', upper)]
+    if (operator === '>=') return [comparator('>=', lower)]
+    if (operator === '<') return [comparator('<', lower)]
+    if (operator === '<=') return [comparator('<', upper)]
+    if (operator === '^') {
+      const caretUpper =
+        major > 0 ? tuple(major + 1) : minor > 0 ? tuple(0, minor + 1) : tuple(0, 0, 1)
+      return [comparator('>=', lower), comparator('<', caretUpper)]
+    }
     return [comparator('>=', lower), comparator('<', upper)]
   }
 
@@ -121,7 +125,7 @@ export function satisfies(version, range) {
   if (typeof range !== 'string' || range.trim() === '')
     throw new Error(`Invalid semantic-version range: ${range}`)
   if (/^(?:workspace:|file:|link:|git\+|https?:)/u.test(range)) {
-    throw new Error(`Domain contract dependency must use a published semver range: ${range}`)
+    throw new Error(`Domain dependency must use a published semver range: ${range}`)
   }
   return range.split('||').some((set) => setSatisfies(parsed, set))
 }

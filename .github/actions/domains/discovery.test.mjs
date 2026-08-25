@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { discoverDomainContracts } from './discovery.mjs'
+import { discoverDomains } from './discovery.mjs'
 
 async function fixture(packages) {
   const root = await mkdtemp(join(tmpdir(), 'domain-discovery-'))
@@ -56,7 +56,7 @@ test('discovers tracked public Domains and derives producer-first order', async 
   await writeFile(join(root, 'untracked', 'astrale.config.ts'), '')
   await writeFile(join(root, 'untracked', 'package.json'), '{"name":"untracked"}')
 
-  const plan = await discoverDomainContracts({ root, repository: 'astrale-os/domains' })
+  const plan = await discoverDomains({ root })
   assert.deepEqual(plan.directories, ['producer', 'consumer'])
   assert.deepEqual(
     plan.packages.map(({ name }) => name),
@@ -64,22 +64,33 @@ test('discovers tracked public Domains and derives producer-first order', async 
   )
 })
 
-test('requires the first-party name and exact release inventories', async () => {
-  const wrongName = await fixture([{ dir: 'alpha', name: '@astrale-os/alpha' }])
-  await assert.rejects(
-    discoverDomainContracts({ root: wrongName, repository: 'astrale-os/domains' }),
-    /must be named @astrale-domains\/alpha/u,
+test('accepts repository-owned package names', async () => {
+  const repositoryOwned = await fixture([{ dir: 'alpha', name: '@example/renamed-domain' }])
+  const named = await discoverDomains({ root: repositoryOwned })
+  assert.deepEqual(
+    named.packages.map(({ name }) => name),
+    ['@example/renamed-domain'],
   )
+})
 
-  const stale = await fixture([{ dir: 'alpha', name: '@astrale-domains/alpha' }])
+test('requires both Release Please inventories and versions to match discovered Domains', async () => {
+  const staleConfig = await fixture([{ dir: 'alpha', name: '@example/alpha' }])
   await writeFile(
-    join(stale, '.release-please-config.json'),
+    join(staleConfig, '.release-please-config.json'),
     '{"packages":{"alpha":{},"removed":{}}}\n',
   )
-  await assert.rejects(
-    discoverDomainContracts({ root: stale }),
-    /must exactly equal public Domains/u,
+  await assert.rejects(discoverDomains({ root: staleConfig }), /packages must exactly equal/u)
+
+  const staleManifest = await fixture([{ dir: 'alpha', name: '@example/alpha' }])
+  await writeFile(
+    join(staleManifest, '.release-please-manifest.json'),
+    '{"alpha":"1.0.0","removed":"1.0.0"}\n',
   )
+  await assert.rejects(discoverDomains({ root: staleManifest }), /manifest must exactly equal/u)
+
+  const wrongVersion = await fixture([{ dir: 'alpha', name: '@example/alpha' }])
+  await writeFile(join(wrongVersion, '.release-please-manifest.json'), '{"alpha":"2.0.0"}\n')
+  await assert.rejects(discoverDomains({ root: wrongVersion }), /package\.json is 1\.0\.0/u)
 })
 
 test('rejects duplicate names and dependency cycles', async () => {
@@ -87,16 +98,13 @@ test('rejects duplicate names and dependency cycles', async () => {
     { dir: 'alpha', name: '@example/shared' },
     { dir: 'beta', name: '@example/shared' },
   ])
-  await assert.rejects(
-    discoverDomainContracts({ root: duplicate }),
-    /Duplicate public Domain package/u,
-  )
+  await assert.rejects(discoverDomains({ root: duplicate }), /Duplicate public Domain package/u)
 
   const cycle = await fixture([
     { dir: 'alpha', name: '@example/alpha', dependencies: { '@example/beta': '^1.0.0' } },
     { dir: 'beta', name: '@example/beta', dependencies: { '@example/alpha': '^1.0.0' } },
   ])
-  await assert.rejects(discoverDomainContracts({ root: cycle }), /dependency cycle/u)
+  await assert.rejects(discoverDomains({ root: cycle }), /dependency cycle/u)
 })
 
 test('selects only manifest versions changed since the supplied commit', async () => {
@@ -111,7 +119,7 @@ test('selects only manifest versions changed since the supplied commit', async (
   execFileSync('git', ['add', '.'], { cwd: root })
   execFileSync('git', ['commit', '-qm', 'release'], { cwd: root })
 
-  const plan = await discoverDomainContracts({ root, selection: 'changed', before })
+  const plan = await discoverDomains({ root, selection: 'changed', before })
   assert.deepEqual(plan.selectedDirectories, ['alpha'])
 })
 
@@ -123,6 +131,6 @@ test('ignores nested frontend configs', async () => {
   execFileSync('git', ['add', '.'], { cwd: root })
   execFileSync('git', ['commit', '-qm', 'nested frontend'], { cwd: root })
 
-  const plan = await discoverDomainContracts({ root })
+  const plan = await discoverDomains({ root })
   assert.deepEqual(plan.directories, ['alpha'])
 })

@@ -1,17 +1,15 @@
-name: Qualify Domain contracts
-description: Discover, pack, inspect, and clean-install every public Domain contract.
+name: Qualify Domains
+description: Discover, pack, and clean-import every public Domain.
 
 inputs:
   root:
     default: .
-  repository:
-    default: ${{ github.repository }}
   selection:
     default: all
   before:
     default: ''
   output-directory:
-    default: ${{ runner.temp }}/domain-contracts
+    default: ${{ runner.temp }}/domains
 
 outputs:
   plan:
@@ -32,15 +30,14 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
-        node-version-file: .nvmrc
+        node-version: 26.7.0
         package-manager-cache: false
 
-    - name: Qualify contract packages
+    - name: Qualify Domains
       id: qualify
       shell: bash
       env:
         INPUT_ROOT: ${{ inputs.root }}
-        INPUT_REPOSITORY: ${{ inputs.repository }}
         INPUT_SELECTION: ${{ inputs.selection }}
         INPUT_BEFORE: ${{ inputs.before }}
         INPUT_OUTPUT_DIRECTORY: ${{ inputs.output-directory }}

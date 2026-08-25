@@ -45,17 +45,17 @@ test('requires exact immutable version and dist-tag evidence', () => {
   )
 })
 
-test('executes the clean consumer root and package-metadata probe', async () => {
+test('executes a generic clean consumer root without requiring named exports', async () => {
   const root = await mkdtemp(join(tmpdir(), 'domain-consumer-probe-'))
   const pkg = join(root, 'node_modules', '@example', 'domain')
   await mkdir(pkg, { recursive: true })
-  await writeFile(join(pkg, 'index.js'), 'export const schema = {}\n')
+  await writeFile(join(pkg, 'index.js'), 'export const implementation = {}\n')
   await writeFile(
     join(pkg, 'package.json'),
     JSON.stringify({
       name: '@example/domain',
       type: 'module',
-      exports: { '.': './index.js', './package.json': './package.json' },
+      exports: './index.js',
     }),
   )
 
@@ -66,29 +66,12 @@ test('executes the clean consumer root and package-metadata probe', async () => 
   )
   assert.equal(admitted.status, 0, `${admitted.stdout}${admitted.stderr}`)
 
-  await writeFile(join(pkg, 'index.js'), 'export const implementation = {}\n')
-  const missingSchema = spawnSync(
+  await writeFile(join(pkg, 'index.js'), "throw new Error('broken root')\n")
+  const brokenRoot = spawnSync(
     'node',
     ['--input-type=module', '-e', CONSUMER_PROBE, '@example/domain'],
     { cwd: root, encoding: 'utf8' },
   )
-  assert.notEqual(missingSchema.status, 0)
-  assert.match(missingSchema.stderr, /root export has no schema/u)
-
-  await writeFile(join(pkg, 'index.js'), 'export const schema = {}\n')
-  await writeFile(
-    join(pkg, 'package.json'),
-    JSON.stringify({
-      name: '@example/wrong-domain',
-      type: 'module',
-      exports: { '.': './index.js', './package.json': './package.json' },
-    }),
-  )
-  const wrongIdentity = spawnSync(
-    'node',
-    ['--input-type=module', '-e', CONSUMER_PROBE, '@example/domain'],
-    { cwd: root, encoding: 'utf8' },
-  )
-  assert.notEqual(wrongIdentity.status, 0)
-  assert.match(wrongIdentity.stderr, /package metadata identity mismatch/u)
+  assert.notEqual(brokenRoot.status, 0)
+  assert.match(brokenRoot.stderr, /broken root/u)
 })

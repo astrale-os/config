@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { CONSUMER_PROBE, writeContractConsumer } from './consumer.mjs'
-import { discoverDomainContracts } from './discovery.mjs'
+import { CONSUMER_PROBE, writeDomainConsumer } from './consumer.mjs'
+import { discoverDomains } from './discovery.mjs'
 
 export function expectedTag(version) {
   const prerelease = version.includes('-')
@@ -35,17 +35,16 @@ export function admitRegistryMetadata({ name, version, versionOutput, tagsOutput
   }
 }
 
-export async function provePublishedContracts({
+export async function provePublishedDomains({
   root = process.cwd(),
-  repository = '',
   selection = 'changed',
   before = '',
   registry = 'https://registry.npmjs.org',
 } = {}) {
-  const plan = await discoverDomainContracts({ root, repository, selection, before })
-  const scratch = await mkdtemp(join(tmpdir(), 'published-domain-contracts-'))
+  const plan = await discoverDomains({ root, selection, before })
+  const scratch = await mkdtemp(join(tmpdir(), 'published-domains-'))
   const npmrc = join(scratch, 'npmrc')
-  await writeFile(npmrc, `registry=${registry}\n@astrale-domains:registry=${registry}\n`)
+  await writeFile(npmrc, `registry=${registry}\n`)
   const env = {
     NPM_CONFIG_USERCONFIG: npmrc,
     NPM_CONFIG_REGISTRY: registry,
@@ -65,23 +64,21 @@ export async function provePublishedContracts({
     })
     admitRegistryMetadata({ ...pkg, versionOutput, tagsOutput })
     const consumer = await mkdtemp(join(scratch, 'consumer-'))
-    await writeContractConsumer({
+    await writeDomainConsumer({
       directory: consumer,
       name: pkg.name,
       dependency: pkg.version,
     })
     run('pnpm', ['install', '--ignore-scripts', '--no-frozen-lockfile'], { cwd: consumer, env })
     run('node', ['--input-type=module', '-e', CONSUMER_PROBE, pkg.name], { cwd: consumer, env })
-    run('pnpm', ['exec', 'tsc', '--noEmit'], { cwd: consumer, env })
-    console.log(`Published contract verified: ${spec}`)
+    console.log(`Published Domain verified: ${spec}`)
   }
   return plan
 }
 
 async function main() {
-  const plan = await provePublishedContracts({
+  const plan = await provePublishedDomains({
     root: process.env.INPUT_ROOT || process.cwd(),
-    repository: process.env.INPUT_REPOSITORY || process.env.GITHUB_REPOSITORY || '',
     selection: process.env.INPUT_SELECTION || 'changed',
     before: process.env.INPUT_BEFORE || '',
   })
@@ -95,7 +92,7 @@ async function main() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch((error) => {
-    console.error(`::error title=Published Domain contract proof failed::${error.message}`)
+    console.error(`::error title=Published Domain proof failed::${error.message}`)
     process.exitCode = 1
   })
 }
