@@ -37,7 +37,9 @@ test('mirrors one exact npm tarball, repairs its tag, and proves private reposit
       fake.publishCalls[0].config.contents,
       /@astrale-os:registry=https:\/\/npm\.pkg\.github\.com/u,
     )
-    assert.match(fake.publishCalls[0].config.contents, new RegExp(TOKEN, 'u'))
+    assert.match(fake.publishCalls[0].config.contents, /_authToken=\$\{NODE_AUTH_TOKEN\}/u)
+    assert.doesNotMatch(fake.publishCalls[0].config.contents, new RegExp(TOKEN, 'u'))
+    assert.equal(fake.publishCalls[0].environment.NODE_AUTH_TOKEN, TOKEN)
     assert.deepEqual(fake.publishCalls[0].args.slice(2), [
       '--access=restricted',
       '--tag',
@@ -62,11 +64,15 @@ test('mirrors one exact npm tarball, repairs its tag, and proves private reposit
       true,
     )
     assert.equal(
-      fake.configUses
-        .filter(({ github }) => !github)
-        .every(({ contents }) => !contents.includes(TOKEN)),
+      fake.configUses.every(({ contents }) => !contents.includes(TOKEN)),
       true,
     )
+    for (const [index, config] of fake.configUses.entries()) {
+      assert.equal(
+        fake.commandEnvironments[index].NODE_AUTH_TOKEN,
+        config.github ? TOKEN : undefined,
+      )
+    }
     assert.equal(
       fake.configUses.every(({ mode }) => mode === 0o600),
       true,
@@ -685,6 +691,7 @@ function fakeBoundary(candidates) {
         bytes: readFileSync(tarball),
         args,
         config,
+        environment: options.env,
       })
       if (!github) boundary.npmPublicWrites += 1
       if (boundary.publishConflict.has(candidate.spec)) {

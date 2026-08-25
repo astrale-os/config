@@ -44,6 +44,10 @@ export async function mirrorPackages({
   delete commandEnvironment.NPM_TOKEN
   delete commandEnvironment.NODE_AUTH_TOKEN
   delete commandEnvironment.MIRROR_GITHUB_TOKEN
+  const githubCommandEnvironment = {
+    ...commandEnvironment,
+    NODE_AUTH_TOKEN: githubToken,
+  }
 
   try {
     await writeFile(
@@ -53,7 +57,7 @@ export async function mirrorPackages({
     )
     await writeFile(
       githubConfig,
-      `registry=${NPM_REGISTRY}/\n@astrale-os:registry=${GITHUB_REGISTRY}/\n//npm.pkg.github.com/:_authToken=${githubToken}\nalways-auth=true\n`,
+      `registry=${GITHUB_REGISTRY}/\n@astrale-os:registry=${GITHUB_REGISTRY}/\n//npm.pkg.github.com/:_authToken=\${NODE_AUTH_TOKEN}\nalways-auth=true\n`,
       { mode: 0o600 },
     )
 
@@ -81,7 +85,7 @@ export async function mirrorPackages({
         candidate,
         githubConfig,
         run,
-        commandEnvironment,
+        githubCommandEnvironment,
         githubToken,
       )
       if (metadata === undefined && candidate.targetVersion === 'present') {
@@ -115,7 +119,7 @@ export async function mirrorPackages({
         wait,
         attempts,
         delayMs,
-        commandEnvironment,
+        commandEnvironment: githubCommandEnvironment,
       })
       await appendSummary(summaryPath, `- \`${candidate.spec}\` -> private GitHub Packages`)
     }
