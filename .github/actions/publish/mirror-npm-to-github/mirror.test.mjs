@@ -134,6 +134,26 @@ test('reports redacted publish evidence when a successful command never material
   })
 })
 
+test('redacts complete publish output before retaining its diagnostic tail', async () => {
+  await fixture(async ({ root, candidate, fake, request }) => {
+    fake.metadataMissing.add(candidate.slug)
+    fake.githubPack404s = 1
+    fake.publishOutput = `${'x'.repeat(100)}${TOKEN}${'y'.repeat(2_000)}tail-marker`
+
+    await assert.rejects(
+      mirrorPackages({
+        ...input(root, [candidate.directory], fake.run, request),
+        attempts: 1,
+      }),
+      (error) => {
+        assert.match(error.message, /tail-marker/u)
+        assert.doesNotMatch(error.message, new RegExp(TOKEN.slice(-8), 'u'))
+        return true
+      },
+    )
+  })
+})
+
 test('fails missing credentials and invalid manifests before any registry access', async () => {
   await fixture(async ({ root, candidate, fake, request }) => {
     await assert.rejects(
@@ -633,6 +653,7 @@ function fakeBoundary(candidates) {
     publishConflict: new Map(),
     githubTagLookup404s: 0,
     githubPack404s: 0,
+    publishOutput: '+ published\n',
     metadataAlwaysMissing: new Set(),
     metadataMissingResponses: new Map(),
   }
@@ -738,7 +759,7 @@ function fakeBoundary(candidates) {
       targetBytes.set(candidate.spec, candidate.bytes)
       const initialTag = args[args.indexOf('--tag') + 1]
       tags.github.get(candidate.name).set(initialTag, candidate.version)
-      return result(0, '+ published\n')
+      return result(0, boundary.publishOutput)
     }
     if (operation === 'dist-tag' && args[1] === 'ls') {
       const name = args[2]

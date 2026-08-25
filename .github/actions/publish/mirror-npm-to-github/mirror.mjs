@@ -525,13 +525,15 @@ function delay(milliseconds) {
 }
 
 function redact(input, token) {
-  const redacted =
-    token.length === 0 ? String(input) : String(input).replaceAll(token, '[REDACTED]')
-  return redacted.replaceAll('\n', ' ').slice(0, 500)
+  return redactSecret(input, token).replaceAll('\n', ' ').slice(0, 500)
 }
 
 function redactTail(input, token) {
-  return redact(String(input).slice(-2_000), token)
+  return redactSecret(input, token).replaceAll('\n', ' ').slice(-500)
+}
+
+function redactSecret(input, token) {
+  return token.length === 0 ? String(input) : String(input).replaceAll(token, '[REDACTED]')
 }
 
 async function appendSummary(path, line, heading = false) {
