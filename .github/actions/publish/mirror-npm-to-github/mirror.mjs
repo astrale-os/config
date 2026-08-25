@@ -291,7 +291,7 @@ async function mirrorOne({
       githubConfig,
       commandEnvironment,
     )
-    publishEvidence = redactTail(result.output, githubToken)
+    publishEvidence = redactTail(result.output, githubToken) || '<empty>'
     if (
       result.status !== 0 &&
       !/already exists|cannot publish over|EPUBLISHCONFLICT|409 Conflict/iu.test(result.output)
