@@ -32,6 +32,9 @@ inputs:
       the channel tag from the identifier (alpha/beta/rc). Set to 'latest' to make
       every prerelease the default install (bare `npm i`). Releases always use latest.
     default: 'auto'
+  tarballs-json:
+    description: Optional directory-to-tarball map prepared and verified by an owning workflow.
+    default: '{}'
 
 runs:
   using: composite
@@ -119,4 +122,5 @@ runs:
         GH_PACKAGES_TOKEN: ${{ inputs.github-token }}
         MIRROR_PUBLIC_PACKAGES: ${{ inputs.mirror-public-packages }}
         PRERELEASE_TAG: ${{ inputs.prerelease-tag }}
+        PUBLISH_TARBALLS_JSON: ${{ inputs.tarballs-json }}
       run: bash "${{ github.action_path }}/publish.sh"
