@@ -21,6 +21,10 @@ export function createConfig({ scopes = [] } = {}) {
       'scope-empty': [0],
       // Keep the lowercase-subject preference as a warning, not a hard failure.
       'subject-case': [1, 'never', ['sentence-case', 'start-case', 'pascal-case', 'upper-case']],
+      // Conventional's default cap is 72, which a `fix(scope): …` prefix eats into
+      // fast — a precise subject routinely lands just over it and hard-fails the
+      // commit. 100 leaves room to say what changed, without inviting essay-titles.
+      'header-max-length': [2, 'always', 100],
       'body-max-line-length': [0],
       'footer-max-line-length': [0],
     },

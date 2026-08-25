@@ -119,7 +119,38 @@ exists_on() {
 }
 
 pack_tarball() {
-  local dir="$1" slug pack_dir tb
+  local dir="$1" slug pack_dir tb prebuilt
+  prebuilt=$(TARBALL_DIRECTORY="$dir" node -e '
+    const map = JSON.parse(process.env.PUBLISH_TARBALLS_JSON || "{}")
+    process.stdout.write(map[process.env.TARBALL_DIRECTORY] || "")
+  ') || return 1
+  if [ -n "$prebuilt" ]; then
+    [ -f "$prebuilt" ] || {
+      echo "Prepared tarball for $dir does not exist: $prebuilt" >&2
+      return 1
+    }
+    local expected_name expected_version identity
+    expected_name=$(field "$dir" name)
+    expected_version=$(field "$dir" version)
+    identity=$(tar -xOf "$prebuilt" package/package.json 2>/dev/null | node -e '
+      let input = ""
+      process.stdin.setEncoding("utf8")
+      process.stdin.on("data", (chunk) => { input += chunk })
+      process.stdin.on("end", () => {
+        const manifest = JSON.parse(input)
+        process.stdout.write(`${manifest.name}@${manifest.version}`)
+      })
+    ') || {
+      echo "Prepared tarball for $dir has no readable package identity: $prebuilt" >&2
+      return 1
+    }
+    [ "$identity" = "$expected_name@$expected_version" ] || {
+      echo "Prepared tarball identity for $dir is $identity; expected $expected_name@$expected_version" >&2
+      return 1
+    }
+    printf '%s' "$prebuilt"
+    return 0
+  fi
   slug=$(printf '%s' "$dir" | tr './' '__')
   pack_dir="$RUNNER_TEMP/packs/$slug"; rm -rf "$pack_dir"; mkdir -p "$pack_dir"
   pnpm --dir "$dir" pack --pack-destination "$pack_dir" >&2 || return 1

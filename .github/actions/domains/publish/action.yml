@@ -1,0 +1,42 @@
+name: Publish Domains
+description: Qualify selected Domains, publish through npm OIDC, and prove registry consumers.
+
+inputs:
+  root:
+    default: .
+  selection:
+    default: changed
+  before:
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare and qualify selected Domains
+      id: domains
+      uses: $/.github/actions/domains/qualify
+      with:
+        root: ${{ inputs.root }}
+        selection: ${{ inputs.selection }}
+        before: ${{ inputs.before }}
+
+    - name: Publish selected Domains
+      if: steps.domains.outputs.has-selected == 'true'
+      uses: $/.github/actions/publish/packages
+      with:
+        dirs: ${{ steps.domains.outputs.dirs }}
+        mirror-public-packages: 'false'
+        install-command: 'true'
+        build-command: 'true'
+        tarballs-json: ${{ steps.domains.outputs.tarballs }}
+
+    - name: Prove published Domains from npm
+      if: steps.domains.outputs.has-selected == 'true'
+      shell: bash
+      env:
+        INPUT_ROOT: ${{ inputs.root }}
+        INPUT_SELECTION: ${{ inputs.selection }}
+        INPUT_BEFORE: ${{ inputs.before }}
+        NODE_AUTH_TOKEN: ''
+        NPM_TOKEN: ''
+      run: node "${{ github.action_path }}/../registry.mjs"
