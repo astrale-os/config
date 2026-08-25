@@ -274,6 +274,7 @@ async function mirrorOne({
   delayMs,
   commandEnvironment,
 }) {
+  let publishEvidence
   if (candidate.targetVersion === 'missing') {
     const initialTag = candidate.source.releaseTags[0]
     const result = runNpm(
@@ -290,6 +291,7 @@ async function mirrorOne({
       githubConfig,
       commandEnvironment,
     )
+    publishEvidence = redactTail(result.output, githubToken)
     if (
       result.status !== 0 &&
       !/already exists|cannot publish over|EPUBLISHCONFLICT|409 Conflict/iu.test(result.output)
@@ -334,7 +336,10 @@ async function mirrorOne({
     },
     { attempts, delayMs, wait },
   )
-  if (target === undefined) fail(`GitHub Packages version ${candidate.spec} is not downloadable.`)
+  if (target === undefined) {
+    const evidence = publishEvidence ? ` Publish command output: ${publishEvidence}` : ''
+    fail(`GitHub Packages version ${candidate.spec} is not downloadable.${evidence}`)
+  }
   if ((await sha512(target)) !== candidate.source.integrity) {
     fail(`GitHub Packages tarball differs from authoritative npm artifact ${candidate.spec}.`)
   }
@@ -522,6 +527,10 @@ function redact(input, token) {
   const redacted =
     token.length === 0 ? String(input) : String(input).replaceAll(token, '[REDACTED]')
   return redacted.replaceAll('\n', ' ').slice(0, 500)
+}
+
+function redactTail(input, token) {
+  return redact(String(input).slice(-2_000), token)
 }
 
 async function appendSummary(path, line, heading = false) {

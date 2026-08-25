@@ -72,6 +72,19 @@ test('mirrors one exact npm tarball, repairs its tag, and proves private reposit
         fake.commandEnvironments[index].NODE_AUTH_TOKEN,
         config.github ? TOKEN : undefined,
       )
+      if (config.github) {
+        assert.match(
+          config.contents,
+          /registry=https:\/\/npm\.pkg\.github\.com\/\n@astrale-os:registry=https:\/\/npm\.pkg\.github\.com\//u,
+        )
+        assert.match(config.contents, /_authToken=\$\{NODE_AUTH_TOKEN\}/u)
+      } else {
+        assert.match(
+          config.contents,
+          /registry=https:\/\/registry\.npmjs\.org\/\n@astrale-os:registry=https:\/\/registry\.npmjs\.org\//u,
+        )
+        assert.doesNotMatch(config.contents, /_authToken/u)
+      }
     }
     assert.equal(
       fake.configUses.every(({ mode }) => mode === 0o600),
@@ -101,6 +114,21 @@ test('waits for GitHub dist-tags to become readable after the artifact propagate
 
     assert.equal(waits, 1)
     assert.deepEqual(fake.tags.github.get(candidate.name), new Map([['beta', candidate.version]]))
+  })
+})
+
+test('reports redacted publish evidence when a successful command never materializes', async () => {
+  await fixture(async ({ root, candidate, fake, request }) => {
+    fake.metadataMissing.add(candidate.slug)
+    fake.githubPack404s = 1
+
+    await assert.rejects(
+      mirrorPackages({
+        ...input(root, [candidate.directory], fake.run, request),
+        attempts: 1,
+      }),
+      /not downloadable\. Publish command output: \+ published/u,
+    )
   })
 })
 
