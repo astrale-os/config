@@ -24,6 +24,10 @@
     "./lint": "./lint.js",
     "./fmt": "./fmt.js"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "peerDependencies": {
     "oxfmt": ">=0.63.0 <1",
     "oxlint": ">=1.78.0 <2"
