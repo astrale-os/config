@@ -25,7 +25,7 @@ runs:
   using: composite
   steps:
     - name: Install crane
-      uses: imjasonh/setup-crane@v0.4
+      uses: imjasonh/setup-crane@31b88efe9de28ae0ffa220711af4b60be9435f6e # v0.4
 
     - name: Login to GAR (source)
       if: inputs.source-gcp-auth == 'true'
