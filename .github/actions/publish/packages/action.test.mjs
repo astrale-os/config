@@ -27,3 +27,34 @@ test('keeps the public GitHub Packages mirror explicit and enabled by default', 
   assert.match(action, /mirror-public-packages:\n(?: {4}.+\n)*? {4}default: 'true'/)
   assert.match(action, /MIRROR_PUBLIC_PACKAGES: \$\{\{ inputs\.mirror-public-packages \}\}/)
 })
+
+test('exposes OIDC and registry credentials only to the publish step', () => {
+  for (const name of [
+    'Upgrade npm (OIDC Trusted Publishing needs npm >= 11.5.1)',
+    'Configure install registries',
+    'Install dependencies',
+    'Build',
+  ]) {
+    const start = action.indexOf(`    - name: ${name}`)
+    assert.notEqual(start, -1, `${name} step is missing`)
+    const next = action.indexOf('\n    - name:', start + 1)
+    const step = action.slice(start, next < 0 ? undefined : next)
+    for (const credential of [
+      'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+      'ACTIONS_ID_TOKEN_REQUEST_URL',
+      'ASTRALE_AUTONOMOUS_INSTALL_TOKEN',
+      'ASTRALE_EPHEMERAL_GITHUB_APP_TOKEN',
+      'GH_TOKEN',
+      'GITHUB_TOKEN',
+      'NODE_AUTH_TOKEN',
+      'NPM_TOKEN',
+    ]) {
+      assert.match(step, new RegExp(`\\n        ${credential}: ''(?:\\n|$)`, 'u'))
+    }
+  }
+
+  const publishStart = action.indexOf('    - name: Publish')
+  assert.notEqual(publishStart, -1, 'Publish step is missing')
+  const publish = action.slice(publishStart)
+  assert.doesNotMatch(publish, /ACTIONS_ID_TOKEN_REQUEST_(?:TOKEN|URL): ''/u)
+})

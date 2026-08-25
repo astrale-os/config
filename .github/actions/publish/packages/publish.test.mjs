@@ -18,7 +18,8 @@ test('allows five minutes for immutable version and dist-tag propagation by defa
 })
 
 test('offers no npm token input or registry-token fallback', () => {
-  assert.doesNotMatch(actionSource, /npm-token|NPM_TOKEN/u)
+  assert.doesNotMatch(actionSource, /^  npm-token:/mu)
+  assert.doesNotMatch(actionSource, /^\s+(?:NODE_AUTH_TOKEN|NPM_TOKEN):\s+\$\{\{/mu)
   assert.doesNotMatch(publisherSource, /registry\.npmjs\.org\/:_authToken/u)
   assert.match(publisherSource, /npm token authentication is forbidden/u)
 })
