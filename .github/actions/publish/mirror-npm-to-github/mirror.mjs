@@ -40,10 +40,15 @@ export async function mirrorPackages({
   const root = await mkdtemp(join(runnerTemp ?? tmpdir(), 'astrale-npm-mirror-'))
   const npmConfig = join(root, 'npm.npmrc')
   const githubConfig = join(root, 'github.npmrc')
+  const runIsolated = (command, args, options = {}) => run(command, args, { ...options, cwd: root })
   const commandEnvironment = { ...environment }
   delete commandEnvironment.NPM_TOKEN
   delete commandEnvironment.NODE_AUTH_TOKEN
   delete commandEnvironment.MIRROR_GITHUB_TOKEN
+  const githubCommandEnvironment = {
+    ...commandEnvironment,
+    NODE_AUTH_TOKEN: githubToken,
+  }
 
   try {
     await writeFile(
@@ -53,7 +58,7 @@ export async function mirrorPackages({
     )
     await writeFile(
       githubConfig,
-      `registry=${NPM_REGISTRY}/\n@astrale-os:registry=${GITHUB_REGISTRY}/\n//npm.pkg.github.com/:_authToken=${githubToken}\nalways-auth=true\n`,
+      `registry=${GITHUB_REGISTRY}/\n@astrale-os:registry=${GITHUB_REGISTRY}/\n//npm.pkg.github.com/:_authToken=\${NODE_AUTH_TOKEN}\nalways-auth=true\n`,
       { mode: 0o600 },
     )
 
@@ -80,8 +85,8 @@ export async function mirrorPackages({
       candidate.targetVersion = registryVersion(
         candidate,
         githubConfig,
-        run,
-        commandEnvironment,
+        runIsolated,
+        githubCommandEnvironment,
         githubToken,
       )
       if (metadata === undefined && candidate.targetVersion === 'present') {
@@ -95,7 +100,7 @@ export async function mirrorPackages({
         candidate,
         root,
         npmConfig,
-        run,
+        run: runIsolated,
         commandEnvironment,
         githubToken,
       })
@@ -110,12 +115,12 @@ export async function mirrorPackages({
         githubToken,
         githubConfig,
         root,
-        run,
+        run: runIsolated,
         request,
         wait,
         attempts,
         delayMs,
-        commandEnvironment,
+        commandEnvironment: githubCommandEnvironment,
       })
       await appendSummary(summaryPath, `- \`${candidate.spec}\` -> private GitHub Packages`)
     }
@@ -270,6 +275,7 @@ async function mirrorOne({
   delayMs,
   commandEnvironment,
 }) {
+  let publishEvidence
   if (candidate.targetVersion === 'missing') {
     const initialTag = candidate.source.releaseTags[0]
     const result = runNpm(
@@ -286,6 +292,7 @@ async function mirrorOne({
       githubConfig,
       commandEnvironment,
     )
+    publishEvidence = redactTail(result.output, githubToken) || '<empty>'
     if (
       result.status !== 0 &&
       !/already exists|cannot publish over|EPUBLISHCONFLICT|409 Conflict/iu.test(result.output)
@@ -330,7 +337,10 @@ async function mirrorOne({
     },
     { attempts, delayMs, wait },
   )
-  if (target === undefined) fail(`GitHub Packages version ${candidate.spec} is not downloadable.`)
+  if (target === undefined) {
+    const evidence = publishEvidence ? ` Publish command output: ${publishEvidence}` : ''
+    fail(`GitHub Packages version ${candidate.spec} is not downloadable.${evidence}`)
+  }
   if ((await sha512(target)) !== candidate.source.integrity) {
     fail(`GitHub Packages tarball differs from authoritative npm artifact ${candidate.spec}.`)
   }
@@ -515,9 +525,15 @@ function delay(milliseconds) {
 }
 
 function redact(input, token) {
-  const redacted =
-    token.length === 0 ? String(input) : String(input).replaceAll(token, '[REDACTED]')
-  return redacted.replaceAll('\n', ' ').slice(0, 500)
+  return redactSecret(input, token).replaceAll('\n', ' ').slice(0, 500)
+}
+
+function redactTail(input, token) {
+  return redactSecret(input, token).replaceAll('\n', ' ').slice(-500)
+}
+
+function redactSecret(input, token) {
+  return token.length === 0 ? String(input) : String(input).replaceAll(token, '[REDACTED]')
 }
 
 async function appendSummary(path, line, heading = false) {

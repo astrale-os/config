@@ -37,7 +37,9 @@ test('mirrors one exact npm tarball, repairs its tag, and proves private reposit
       fake.publishCalls[0].config.contents,
       /@astrale-os:registry=https:\/\/npm\.pkg\.github\.com/u,
     )
-    assert.match(fake.publishCalls[0].config.contents, new RegExp(TOKEN, 'u'))
+    assert.match(fake.publishCalls[0].config.contents, /_authToken=\$\{NODE_AUTH_TOKEN\}/u)
+    assert.doesNotMatch(fake.publishCalls[0].config.contents, new RegExp(TOKEN, 'u'))
+    assert.equal(fake.publishCalls[0].environment.NODE_AUTH_TOKEN, TOKEN)
     assert.deepEqual(fake.publishCalls[0].args.slice(2), [
       '--access=restricted',
       '--tag',
@@ -62,11 +64,30 @@ test('mirrors one exact npm tarball, repairs its tag, and proves private reposit
       true,
     )
     assert.equal(
-      fake.configUses
-        .filter(({ github }) => !github)
-        .every(({ contents }) => !contents.includes(TOKEN)),
+      fake.configUses.every(({ contents }) => !contents.includes(TOKEN)),
       true,
     )
+    for (const [index, config] of fake.configUses.entries()) {
+      assert.equal(
+        fake.commandEnvironments[index].NODE_AUTH_TOKEN,
+        config.github ? TOKEN : undefined,
+      )
+      if (config.github) {
+        assert.match(
+          config.contents,
+          /registry=https:\/\/npm\.pkg\.github\.com\/\n@astrale-os:registry=https:\/\/npm\.pkg\.github\.com\//u,
+        )
+        assert.match(config.contents, /_authToken=\$\{NODE_AUTH_TOKEN\}/u)
+      } else {
+        assert.match(
+          config.contents,
+          /registry=https:\/\/registry\.npmjs\.org\/\n@astrale-os:registry=https:\/\/registry\.npmjs\.org\//u,
+        )
+        assert.doesNotMatch(config.contents, /_authToken/u)
+      }
+      assert.equal(config.cwd, dirname(config.path))
+      assert.notEqual(config.cwd, root)
+    }
     assert.equal(
       fake.configUses.every(({ mode }) => mode === 0o600),
       true,
@@ -95,6 +116,41 @@ test('waits for GitHub dist-tags to become readable after the artifact propagate
 
     assert.equal(waits, 1)
     assert.deepEqual(fake.tags.github.get(candidate.name), new Map([['beta', candidate.version]]))
+  })
+})
+
+test('reports redacted publish evidence when a successful command never materializes', async () => {
+  await fixture(async ({ root, candidate, fake, request }) => {
+    fake.metadataMissing.add(candidate.slug)
+    fake.githubPack404s = 1
+
+    await assert.rejects(
+      mirrorPackages({
+        ...input(root, [candidate.directory], fake.run, request),
+        attempts: 1,
+      }),
+      /not downloadable\. Publish command output: \+ published/u,
+    )
+  })
+})
+
+test('redacts complete publish output before retaining its diagnostic tail', async () => {
+  await fixture(async ({ root, candidate, fake, request }) => {
+    fake.metadataMissing.add(candidate.slug)
+    fake.githubPack404s = 1
+    fake.publishOutput = `${'x'.repeat(100)}${TOKEN}${'y'.repeat(484)}tail-marker`
+
+    await assert.rejects(
+      mirrorPackages({
+        ...input(root, [candidate.directory], fake.run, request),
+        attempts: 1,
+      }),
+      (error) => {
+        assert.match(error.message, /tail-marker/u)
+        assert.doesNotMatch(error.message, new RegExp(TOKEN.slice(-5), 'u'))
+        return true
+      },
+    )
   })
 })
 
@@ -597,6 +653,7 @@ function fakeBoundary(candidates) {
     publishConflict: new Map(),
     githubTagLookup404s: 0,
     githubPack404s: 0,
+    publishOutput: '+ published\n',
     metadataAlwaysMissing: new Set(),
     metadataMissingResponses: new Map(),
   }
@@ -627,6 +684,7 @@ function fakeBoundary(candidates) {
       path: configPath,
       contents: readFileSync(configPath, 'utf8'),
       mode: statSync(configPath).mode & 0o777,
+      cwd: options.cwd,
     }
     configUses.push(config)
     commandEnvironments.push(options.env)
@@ -685,6 +743,7 @@ function fakeBoundary(candidates) {
         bytes: readFileSync(tarball),
         args,
         config,
+        environment: options.env,
       })
       if (!github) boundary.npmPublicWrites += 1
       if (boundary.publishConflict.has(candidate.spec)) {
@@ -700,7 +759,7 @@ function fakeBoundary(candidates) {
       targetBytes.set(candidate.spec, candidate.bytes)
       const initialTag = args[args.indexOf('--tag') + 1]
       tags.github.get(candidate.name).set(initialTag, candidate.version)
-      return result(0, '+ published\n')
+      return result(0, boundary.publishOutput)
     }
     if (operation === 'dist-tag' && args[1] === 'ls') {
       const name = args[2]
