@@ -1,19 +1,12 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import {
-  appendFile,
-  copyFile,
-  mkdir,
-  mkdtemp,
-  readFile,
-  readdir,
-  writeFile,
-} from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { CONSUMER_PROBE, writeDomainConsumer } from './consumer.mjs'
 import { discoverDomains } from './discovery.mjs'
+import { writeOutput } from './output.mjs'
 import { satisfies } from './semver.mjs'
 import { inspectDomainTarball } from './tarball.mjs'
 
@@ -281,12 +274,6 @@ export async function qualifyDomains({
   }
 
   return { plan, tarballs: tarballsByDirectory, outputDirectory: output }
-}
-
-async function writeOutput(name, value) {
-  if (process.env.GITHUB_OUTPUT) {
-    await appendFile(process.env.GITHUB_OUTPUT, `${name}=${JSON.stringify(value)}\n`)
-  }
 }
 
 async function main() {
