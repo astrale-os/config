@@ -1,7 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { appendFile, readFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { dirname, posix, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+
+import { writeOutput } from './output.mjs'
 
 const DEPENDENCY_FIELDS = ['dependencies', 'optionalDependencies', 'peerDependencies']
 const CONFIG_PATTERN = /(?:^|\/)astrale\.config\.[^/]+$/u
@@ -188,12 +190,6 @@ export async function discoverDomains({
     selected: selected.map(projection),
     directories: ordered.map(({ directory }) => directory),
     selectedDirectories: selected.map(({ directory }) => directory),
-  }
-}
-
-async function writeOutput(name, value) {
-  if (process.env.GITHUB_OUTPUT) {
-    await appendFile(process.env.GITHUB_OUTPUT, `${name}=${JSON.stringify(value)}\n`)
   }
 }
 
