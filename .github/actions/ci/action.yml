@@ -95,6 +95,20 @@ runs:
         ACTIONS_ID_TOKEN_REQUEST_TOKEN: ''
         ACTIONS_ID_TOKEN_REQUEST_URL: ''
 
+    - name: Rebuild dependencies without credentials
+      if: inputs.token != ''
+      shell: bash
+      run: bash "${{ github.action_path }}/../rebuild-dependencies.sh"
+      env:
+        NODE_AUTH_TOKEN: ''
+        NPM_TOKEN: ''
+        GH_TOKEN: ''
+        GITHUB_TOKEN: ''
+        ACTIONS_ID_TOKEN_REQUEST_TOKEN: ''
+        ACTIONS_ID_TOKEN_REQUEST_URL: ''
+        ASTRALE_EPHEMERAL_GITHUB_APP_TOKEN: ''
+        ASTRALE_AUTONOMOUS_INSTALL_TOKEN: ''
+
     - name: Build packages (before checks)
       if: inputs.build-first == 'true'
       shell: bash
