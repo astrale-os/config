@@ -25,7 +25,7 @@
     "./fmt": "./fmt.js"
   },
   "peerDependencies": {
-    "oxfmt": ">=0.1.0",
-    "oxlint": ">=1.0.0"
+    "oxfmt": ">=0.63.0 <1",
+    "oxlint": ">=1.78.0 <2"
   }
 }

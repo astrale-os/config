@@ -45,10 +45,10 @@ importers:
   packages/ox:
     dependencies:
       oxfmt:
-        specifier: '>=0.1.0'
+        specifier: '>=0.63.0 <1'
         version: 0.63.0
       oxlint:
-        specifier: '>=1.0.0'
+        specifier: '>=1.78.0 <2'
         version: 1.78.0
 
   packages/renovate: {}
