@@ -16,7 +16,6 @@ minimumReleaseAgeExclude:
   - '@astrale-os/*'
   - '@astrale-domains/*'
   - '@astrale/*'
-  - '@jsr/astrale__commitlint-config@2.0.5'
   - 'create-astrale-domain'
   - 'bun-types@1.4.0'
 
