@@ -20,6 +20,9 @@ inputs:
   frozen-lockfile:
     description: Use the repository lockfile without allowing dependency drift
     default: 'true'
+  cache:
+    description: Cache the pnpm store for token-free frozen installs
+    default: 'true'
   build-first:
     description: Build packages before running checks (required for monorepos with inter-package dependencies)
     default: 'true'
@@ -68,7 +71,7 @@ runs:
         scope: ${{ inputs.scope }}
 
     - name: Setup Node.js (no registry + cache)
-      if: inputs.registry-url == '' && inputs.token == '' && inputs.frozen-lockfile == 'true'
+      if: inputs.registry-url == '' && inputs.token == '' && inputs.frozen-lockfile == 'true' && inputs.cache == 'true'
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
         node-version: ${{ inputs.node-version }}
@@ -76,7 +79,7 @@ runs:
         cache: pnpm
 
     - name: Setup Node.js (no registry, no cache)
-      if: inputs.registry-url == '' && (inputs.token != '' || inputs.frozen-lockfile != 'true')
+      if: inputs.registry-url == '' && (inputs.token != '' || inputs.frozen-lockfile != 'true' || inputs.cache != 'true')
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
         node-version: ${{ inputs.node-version }}
@@ -112,29 +115,41 @@ runs:
     - name: Build packages (before checks)
       if: inputs.build-first == 'true'
       shell: bash
-      run: ${{ inputs.build-command }}
+      run: bash "${{ github.action_path }}/../run-token-free.sh" bash -euo pipefail -c "$CONFIG_ACTION_COMMAND"
+      env:
+        CONFIG_ACTION_COMMAND: ${{ inputs.build-command }}
 
     - name: Run oxlint
       if: inputs.run-lint == 'true'
       shell: bash
-      run: ${{ inputs.lint-command }}
+      run: bash "${{ github.action_path }}/../run-token-free.sh" bash -euo pipefail -c "$CONFIG_ACTION_COMMAND"
+      env:
+        CONFIG_ACTION_COMMAND: ${{ inputs.lint-command }}
 
     - name: Check formatting
       if: inputs.run-lint == 'true'
       shell: bash
-      run: ${{ inputs.format-check-command }}
+      run: bash "${{ github.action_path }}/../run-token-free.sh" bash -euo pipefail -c "$CONFIG_ACTION_COMMAND"
+      env:
+        CONFIG_ACTION_COMMAND: ${{ inputs.format-check-command }}
 
     - name: Run type check
       if: inputs.run-typecheck == 'true'
       shell: bash
-      run: ${{ inputs.typecheck-command }}
+      run: bash "${{ github.action_path }}/../run-token-free.sh" bash -euo pipefail -c "$CONFIG_ACTION_COMMAND"
+      env:
+        CONFIG_ACTION_COMMAND: ${{ inputs.typecheck-command }}
 
     - name: Run tests
       if: inputs.run-test == 'true'
       shell: bash
-      run: ${{ inputs.test-command }}
+      run: bash "${{ github.action_path }}/../run-token-free.sh" bash -euo pipefail -c "$CONFIG_ACTION_COMMAND"
+      env:
+        CONFIG_ACTION_COMMAND: ${{ inputs.test-command }}
 
     - name: Build packages (after checks)
       if: inputs.run-build == 'true' && inputs.build-first == 'false'
       shell: bash
-      run: ${{ inputs.build-command }}
+      run: bash "${{ github.action_path }}/../run-token-free.sh" bash -euo pipefail -c "$CONFIG_ACTION_COMMAND"
+      env:
+        CONFIG_ACTION_COMMAND: ${{ inputs.build-command }}

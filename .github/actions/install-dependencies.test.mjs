@@ -7,6 +7,7 @@ import test from 'node:test'
 
 const installer = path.resolve('.github/actions/install-dependencies.sh')
 const rebuilder = path.resolve('.github/actions/rebuild-dependencies.sh')
+const tokenFreeRunner = path.resolve('.github/actions/run-token-free.sh')
 const credentialVariables = [
   'NODE_AUTH_TOKEN',
   'NPM_TOKEN',
@@ -18,17 +19,20 @@ const credentialVariables = [
   'ASTRALE_AUTONOMOUS_INSTALL_TOKEN',
 ]
 
-function runScript(script, { cwd, env }) {
+function runScript(script, { args = [], cwd, env }) {
   return new Promise((resolve) => {
-    const child = spawn('bash', [script], {
+    const child = spawn('bash', [script, ...args], {
       cwd,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
+    let stdout = ''
     let stderr = ''
+    child.stdout.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => (stdout += chunk))
     child.stderr.setEncoding('utf8')
     child.stderr.on('data', (chunk) => (stderr += chunk))
-    child.on('close', (code) => resolve({ code, pid: child.pid, stderr }))
+    child.on('close', (code) => resolve({ code, pid: child.pid, stderr, stdout }))
   })
 }
 
@@ -44,7 +48,7 @@ async function runBoundary({ frozen = 'true', inspectAncestors = false, token = 
     fakePnpm,
     `#!/usr/bin/env bash
 set -euo pipefail
-printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \\
+printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \\
   "$*" \\
   "\${NODE_AUTH_TOKEN-}" \\
   "\${NPM_TOKEN-}" \\
@@ -54,7 +58,10 @@ printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \\
   "\${ACTIONS_ID_TOKEN_REQUEST_URL-}" \\
   "\${ASTRALE_EPHEMERAL_GITHUB_APP_TOKEN-}" \\
   "\${ASTRALE_AUTONOMOUS_INSTALL_TOKEN-}" \\
-  "\${NPM_CONFIG_USERCONFIG-}" >> "$INSTALL_LOG"
+  "\${NPM_CONFIG_USERCONFIG-}" \\
+  "\${NPM_CONFIG_GLOBALCONFIG-}" \\
+  "\${NPM_CONFIG_REGISTRY-}" \\
+  "\${NPM_CONFIG_OFFLINE-}" >> "$INSTALL_LOG"
 
 if [[ "$*" == '-r rebuild --pending' && -n "\${LIFECYCLE_PROBE-}" ]]; then
   bash "$LIFECYCLE_PROBE"
@@ -107,6 +114,9 @@ printf 'checked=%s\\n' "$checked" >> "$ANCESTOR_LOG"
     PATH: `${bin}:${process.env.PATH}`,
     INSTALL_LOG: log,
     NPM_CONFIG_USERCONFIG: '/authenticated/userconfig',
+    NPM_CONFIG_GLOBALCONFIG: '/authenticated/globalconfig',
+    NPM_CONFIG_REGISTRY: 'https://npm.pkg.github.com/',
+    NPM_CONFIG_OFFLINE: 'false',
   }
 
   try {
@@ -163,17 +173,72 @@ test('authenticated fetch exits before a credential-free rebuild process starts'
     '',
     '',
     '/authenticated/userconfig',
+    '/authenticated/globalconfig',
+    'https://npm.pkg.github.com/',
+    'false',
   ])
   assert.deepEqual(calls[1].slice(1, 9), ['', '', '', '', '', '', '', ''])
   assert.notEqual(calls[1][9], '/authenticated/userconfig')
+  assert.notEqual(calls[1][10], '/authenticated/globalconfig')
+  assert.equal(calls[1][11], 'https://registry.npmjs.org/')
+  assert.equal(calls[1][12], 'true')
 })
 
 test('unauthenticated install keeps normal lifecycle handling but scrubs ambient credentials', async () => {
   const { calls } = await runBoundary({ frozen: 'false' })
 
   assert.deepEqual(calls, [
-    ['install', '', '', '', '', '', '', '', '', '/authenticated/userconfig'],
+    [
+      'install',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '/authenticated/userconfig',
+      '/authenticated/globalconfig',
+      'https://npm.pkg.github.com/',
+      'false',
+    ],
   ])
+})
+
+test('token-free commands are offline even when the project routes Astrale to GPR', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'config-token-free-project-'))
+  try {
+    await writeFile(
+      path.join(directory, '.npmrc'),
+      '@astrale-os:registry=https://npm.pkg.github.com/\n',
+    )
+    const result = await runScript(tokenFreeRunner, {
+      args: ['env'],
+      cwd: directory,
+      env: {
+        ...process.env,
+        NODE_AUTH_TOKEN: 'must-not-survive',
+        NPM_CONFIG_OFFLINE: 'false',
+      },
+    })
+
+    assert.equal(result.code, 0, result.stderr)
+    const environment = Object.fromEntries(
+      result.stdout
+        .split('\n')
+        .filter(Boolean)
+        .map((entry) => {
+          const separator = entry.indexOf('=')
+          return [entry.slice(0, separator), entry.slice(separator + 1)]
+        }),
+    )
+    assert.equal(environment.NPM_CONFIG_OFFLINE, 'true')
+    assert.equal(environment.npm_config_offline, 'true')
+    assert.equal(environment.NODE_AUTH_TOKEN, undefined)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 test(
