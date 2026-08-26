@@ -62,6 +62,9 @@ export default createConfig({
 
 Composite actions organized by category in `.github/actions/`.
 
+The examples below pin the qualified Config action revision. Keep this revision immutable; never
+replace it with a branch such as `main`.
+
 ```
 .github/actions/
 ├── setup/           # pnpm + Node.js + install
@@ -80,7 +83,7 @@ Setup pnpm, Node.js, and install dependencies.
 ```yaml
 steps:
   - uses: actions/checkout@v4
-  - uses: astrale-os/config/.github/actions/setup@main
+  - uses: astrale-os/config/.github/actions/setup@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
 ```
 
 | Input               | Default  | Description               |
@@ -97,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astrale-os/config/.github/actions/ci@main
+      - uses: astrale-os/config/.github/actions/ci@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
         with:
           run-test: 'false' # optional
 ```
@@ -129,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astrale-os/config/.github/actions/publish/jsr@main
+      - uses: astrale-os/config/.github/actions/publish/jsr@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
 ```
 
 | Input               | Default  | Description                   |
@@ -148,7 +151,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astrale-os/config/.github/actions/publish/npm@main
+      - uses: astrale-os/config/.github/actions/publish/npm@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
         with:
           scope: '@astrale-os'
           token: ${{ github.token }}
@@ -186,7 +189,7 @@ permissions:
 
 steps:
   - uses: actions/checkout@v4
-  - uses: astrale-os/config/.github/actions/publish/mirror-npm-to-github@<sha>
+  - uses: astrale-os/config/.github/actions/publish/mirror-npm-to-github@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
     with:
       dirs: '. adapter-cloudflare adapter-astrale'
       github-token: ${{ github.token }}
@@ -207,7 +210,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astrale-os/config/.github/actions/release@main
+      - uses: astrale-os/config/.github/actions/release@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
         with:
           token: ${{ github.token }}
           target-branch: main
