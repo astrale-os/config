@@ -13,7 +13,7 @@ Runs CI checks: lint, format, typecheck, test, and build.
 ### Basic (Monorepo - builds first)
 
 ```yaml
-- uses: astrale-os/config/.github/actions/ci@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+- uses: astrale-os/config/.github/actions/ci@9bffee57d53b603b556bb545145fdde10f20a4c5
 ```
 
 This will:
@@ -27,7 +27,7 @@ This will:
 ### Single Package (build after checks)
 
 ```yaml
-- uses: astrale-os/config/.github/actions/ci@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+- uses: astrale-os/config/.github/actions/ci@9bffee57d53b603b556bb545145fdde10f20a4c5
   with:
     build-first: 'false'
     run-build: 'true'
@@ -44,7 +44,7 @@ This will:
 ### Custom Configuration
 
 ```yaml
-- uses: astrale-os/config/.github/actions/ci@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+- uses: astrale-os/config/.github/actions/ci@9bffee57d53b603b556bb545145fdde10f20a4c5
   with:
     build-first: 'true' # Build before checks (default: true)
     run-lint: 'true' # Run linting (default: true)

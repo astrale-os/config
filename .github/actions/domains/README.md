@@ -20,7 +20,7 @@ folders, require SDK exports, or duplicate the package command's semantic checks
 ```yaml
 jobs:
   domains:
-    uses: astrale-os/config/.github/workflows/domains-ci.yml@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+    uses: astrale-os/config/.github/workflows/domains-ci.yml@9bffee57d53b603b556bb545145fdde10f20a4c5
 ```
 
 The called workflow checks out the caller, derives producer-first order, packs every public Domain
@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   domains:
-    uses: astrale-os/config/.github/workflows/domains-publish.yml@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+    uses: astrale-os/config/.github/workflows/domains-publish.yml@9bffee57d53b603b556bb545145fdde10f20a4c5
     permissions:
       contents: read
       id-token: write

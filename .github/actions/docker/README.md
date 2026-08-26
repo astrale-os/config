@@ -13,7 +13,7 @@ Build Docker image with buildx caching. Does not push.
 Build and push to Google Artifact Registry using Workload Identity Federation.
 
 ```yaml
-- uses: astrale-os/config/.github/actions/docker/push-gar@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+- uses: astrale-os/config/.github/actions/docker/push-gar@9bffee57d53b603b556bb545145fdde10f20a4c5
   id: gar
   with:
     project: astrale-tech-staging
@@ -29,7 +29,7 @@ Build and push to Google Artifact Registry using Workload Identity Federation.
 Build and push to GitHub Container Registry.
 
 ```yaml
-- uses: astrale-os/config/.github/actions/docker/push-ghcr@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+- uses: astrale-os/config/.github/actions/docker/push-ghcr@9bffee57d53b603b556bb545145fdde10f20a4c5
   with:
     token: ${{ secrets.GITHUB_TOKEN }}
     image-name: kernel
@@ -41,7 +41,7 @@ Build and push to GitHub Container Registry.
 Copy image between registries using crane (no rebuild, very fast).
 
 ```yaml
-- uses: astrale-os/config/.github/actions/docker/copy@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+- uses: astrale-os/config/.github/actions/docker/copy@9bffee57d53b603b556bb545145fdde10f20a4c5
   with:
     source: europe-west1-docker.pkg.dev/project/repo/image:1.0.0
     destination: ghcr.io/org/image:1.0.0
@@ -59,7 +59,7 @@ jobs:
   docker:
     steps:
       # 1. Build and push to primary registry (GAR)
-      - uses: astrale-os/config/.github/actions/docker/push-gar@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+      - uses: astrale-os/config/.github/actions/docker/push-gar@9bffee57d53b603b556bb545145fdde10f20a4c5
         id: gar
         with:
           project: astrale-tech-staging
@@ -70,7 +70,7 @@ jobs:
           service-account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       # 2. Copy to secondary registry (ghcr.io) - no rebuild!
-      - uses: astrale-os/config/.github/actions/docker/copy@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+      - uses: astrale-os/config/.github/actions/docker/copy@9bffee57d53b603b556bb545145fdde10f20a4c5
         with:
           source: ${{ steps.gar.outputs.image }}
           destination: ghcr.io/astrale-os/kernel:${{ steps.version.outputs.version }}
