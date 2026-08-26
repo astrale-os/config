@@ -11,7 +11,7 @@
     "preinstall": "node -e \"try{require('./.check-workspace.cjs')}catch{}\"",
     "build": "pnpm -r --if-present run build",
     "clean": "pnpm -r --if-present run clean",
-    "typecheck": "pnpm -r --if-present run typecheck",
+    "typecheck": "tsc --noEmit && pnpm -r --if-present run typecheck",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
     "format": "pnpm exec oxfmt --write .",
