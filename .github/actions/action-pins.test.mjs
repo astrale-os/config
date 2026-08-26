@@ -4,7 +4,7 @@ import path from 'node:path'
 import test from 'node:test'
 
 const roots = ['.github/actions', '.github/workflows']
-const qualifiedConfigRevision = 'e89c7e84ed0b5bad2dcbf80f7a4547e30672155e'
+const qualifiedConfigRevision = '9bffee57d53b603b556bb545145fdde10f20a4c5'
 const explicitConfigPlaceholder = '<CONFIG_ACTION_SHA>'
 
 async function yamlFiles(directory) {

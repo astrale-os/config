@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: astrale-os/config/.github/actions/merge-guard@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+      - uses: astrale-os/config/.github/actions/merge-guard@9bffee57d53b603b556bb545145fdde10f20a4c5
         with:
           github-token: ${{ github.token }}
           dependencies: '["kernel"]'
@@ -33,7 +33,7 @@ jobs:
 ```yaml
 jobs:
   merge-guard:
-    uses: astrale-os/config/.github/workflows/merge-guard.yml@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+    uses: astrale-os/config/.github/workflows/merge-guard.yml@9bffee57d53b603b556bb545145fdde10f20a4c5
     with:
       dependencies: '["kernel"]'
 ```

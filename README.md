@@ -83,7 +83,7 @@ Setup pnpm, Node.js, and install dependencies.
 ```yaml
 steps:
   - uses: actions/checkout@v4
-  - uses: astrale-os/config/.github/actions/setup@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+  - uses: astrale-os/config/.github/actions/setup@9bffee57d53b603b556bb545145fdde10f20a4c5
 ```
 
 | Input               | Default  | Description               |
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astrale-os/config/.github/actions/ci@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+      - uses: astrale-os/config/.github/actions/ci@9bffee57d53b603b556bb545145fdde10f20a4c5
         with:
           run-test: 'false' # optional
 ```
@@ -132,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astrale-os/config/.github/actions/publish/jsr@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+      - uses: astrale-os/config/.github/actions/publish/jsr@9bffee57d53b603b556bb545145fdde10f20a4c5
 ```
 
 | Input               | Default  | Description                   |
@@ -151,7 +151,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astrale-os/config/.github/actions/publish/npm@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+      - uses: astrale-os/config/.github/actions/publish/npm@9bffee57d53b603b556bb545145fdde10f20a4c5
         with:
           scope: '@astrale-os'
           token: ${{ github.token }}
@@ -189,7 +189,7 @@ permissions:
 
 steps:
   - uses: actions/checkout@v4
-  - uses: astrale-os/config/.github/actions/publish/mirror-npm-to-github@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+  - uses: astrale-os/config/.github/actions/publish/mirror-npm-to-github@9bffee57d53b603b556bb545145fdde10f20a4c5
     with:
       dirs: '. adapter-cloudflare adapter-astrale'
       github-token: ${{ github.token }}
@@ -210,7 +210,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astrale-os/config/.github/actions/release@e89c7e84ed0b5bad2dcbf80f7a4547e30672155e
+      - uses: astrale-os/config/.github/actions/release@9bffee57d53b603b556bb545145fdde10f20a4c5
         with:
           token: ${{ github.token }}
           target-branch: main
