@@ -11,7 +11,7 @@ export async function writeDomainConsumer({ directory, name, dependency, overrid
       {
         private: true,
         type: 'module',
-        packageManager: 'pnpm@11.13.1',
+        packageManager: 'pnpm@12.0.0',
         dependencies: { ...overrides, [name]: dependency },
       },
       null,
