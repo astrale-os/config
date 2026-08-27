@@ -17,7 +17,7 @@ Repository-level GitHub merge policy is declared and reconciled from
 ## Installation
 
 Development defaults to **Node.js 26.7.0** and also supports Node.js 24. pnpm
-**11.13.1** is required.
+**12.0.0** is required.
 
 ```bash
 pnpm add -D jsr:@astrale/typescript-config jsr:@astrale/commitlint-config
