@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": "Astrale OS default Renovate configuration",
-  "extends": ["config:recommended"],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
   "rangeStrategy": "bump",
   "labels": ["dependencies"],
   "packageRules": [
