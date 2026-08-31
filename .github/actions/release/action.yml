@@ -19,6 +19,9 @@ outputs:
   releases_created:
     description: Whether any releases were created
     value: ${{ steps.release.outputs.releases_created }}
+  release_sha:
+    description: Exact revision shared by every release created in this invocation
+    value: ${{ steps.release-revision.outputs.sha }}
   paths_released:
     description: JSON array of paths that were released
     value: ${{ steps.release.outputs.paths_released }}
@@ -43,3 +46,11 @@ runs:
         config-file: ${{ inputs.config-file }}
         manifest-file: ${{ inputs.manifest-file }}
         target-branch: ${{ inputs.target-branch || github.event.repository.default_branch }}
+    - name: Resolve exact released revision
+      id: release-revision
+      if: steps.release.outputs.releases_created == 'true'
+      shell: bash
+      env:
+        RELEASE_OUTPUTS: ${{ toJSON(steps.release.outputs) }}
+        PATHS_RELEASED: ${{ steps.release.outputs.paths_released }}
+      run: node "${{ github.action_path }}/resolve-release-sha.mjs"
