@@ -202,7 +202,7 @@ agent_check_browser() {
 
 agent_skill_directory() {
   case "$1" in
-    codex) printf '%s/skills\n' "${CODEX_HOME:-$HOME/.codex}" ;;
+    codex) printf '%s/.agents/skills\n' "$HOME" ;;
     claude-code) printf '%s/skills\n' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ;;
     *) agent_die "Unsupported skills target: $1" ;;
   esac
