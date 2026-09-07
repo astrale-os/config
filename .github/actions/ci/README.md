@@ -79,7 +79,7 @@ build → @org/core dist created → typecheck → @org/memory finds @org/core �
 | ---------------------- | ------------------------------- | ------------------- |
 | `node-version-file`    | Path to .nvmrc or similar       | `.nvmrc`            |
 | `build-first`          | Build before checks (monorepos) | `true`              |
-| `run-lint`             | Run ESLint and Prettier         | `true`              |
+| `run-lint`             | Run lint and format checks      | `true`              |
 | `run-typecheck`        | Run TypeScript type checking    | `true`              |
 | `run-test`             | Run tests                       | `true`              |
 | `run-build`            | Build after checks              | `false`             |

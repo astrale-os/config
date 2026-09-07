@@ -47,7 +47,7 @@ jobs:
 | `datastore`    | `[]`                         |
 | `adapters`     | `["kernel", "typegraph"]`    |
 | `shell`        | `["kernel"]`                 |
-| `sdk`          | `["kernel", "shell"]`        |
+| `sdk`          | `["kernel"]`                 |
 | `gui`          | `["kernel", "shell"]`        |
 | `cli`          | `["kernel", "sdk"]`          |
 | `distribution` | `["kernel", "shell", "sdk"]` |

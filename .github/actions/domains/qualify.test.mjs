@@ -33,7 +33,7 @@ await writeFile('lib/index.js', 'export const value = 1\\n')
         scripts: { prepack: 'node prepare.mjs' },
         dependencies,
         ...additional,
-        packageManager: 'pnpm@12.0.0',
+        packageManager: 'pnpm@12.1.0',
       },
       null,
       2,
