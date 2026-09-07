@@ -2,6 +2,10 @@
 
 Shared configurations and composite actions for Astrale TypeScript monorepos.
 
+Shared agent setup sources live in [`scripts/agent_setup`](scripts/agent_setup/README.md).
+They are explicitly synchronized and committed in consumer repositories; setup never fetches
+these shell scripts at runtime.
+
 Repository-level GitHub merge policy is declared and reconciled from
 [`github/repository-policy`](github/repository-policy/README.md).
 
