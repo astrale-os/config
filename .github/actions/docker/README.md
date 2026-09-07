@@ -74,9 +74,7 @@ jobs:
         with:
           source: ${{ steps.gar.outputs.image }}
           destination: ghcr.io/astrale-os/kernel:${{ steps.version.outputs.version }}
-          source-registry: europe-west1-docker.pkg.dev
-          source-username: oauth2accesstoken
-          source-password: ${{ steps.gar.outputs.token }}
+          source-gcp-auth: 'true'
           dest-registry: ghcr.io
           dest-username: ${{ github.actor }}
           dest-password: ${{ secrets.GITHUB_TOKEN }}

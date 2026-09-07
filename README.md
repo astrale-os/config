@@ -9,15 +9,18 @@ Repository-level GitHub merge policy is declared and reconciled from
 
 | Package                      | JSR                                                                                                   | Description                 |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------- |
-| `@astrale-os/ox`             | —                                                                                                     | oxlint + oxfmt CLI wrapper  |
+| `@astrale-os/ox`             | —                                                                                                     | Shared oxlint and oxfmt configuration |
 | `@astrale/typescript-config` | [![JSR](https://jsr.io/badges/@astrale/typescript-config)](https://jsr.io/@astrale/typescript-config) | Base tsconfig presets       |
 | `@astrale/commitlint-config` | [![JSR](https://jsr.io/badges/@astrale/commitlint-config)](https://jsr.io/@astrale/commitlint-config) | Conventional commits config |
-| `@astrale/renovate-config`   | —                                                                                                     | Renovate dependency updates |
+| `@astrale-os/renovate-config` | —                                                                                                     | Renovate dependency updates |
 
 ## Installation
 
 Development defaults to **Node.js 26.7.0** and also supports Node.js 24. pnpm
-**12.0.0** is required.
+**12.1.0** is required.
+
+For repository development, run `STANDALONE=true pnpm install --frozen-lockfile` from the root of
+a standalone clone. When working in the Astrale umbrella workspace, install from its root instead.
 
 ```bash
 pnpm add -D jsr:@astrale/typescript-config jsr:@astrale/commitlint-config
@@ -108,10 +111,10 @@ jobs:
 | Input                  | Default             | Description               |
 | ---------------------- | ------------------- | ------------------------- |
 | `node-version-file`    | `.nvmrc`            | Path to Node version file |
-| `run-lint`             | `true`              | Run ESLint and Prettier   |
+| `run-lint`             | `true`              | Run lint and format checks |
 | `run-typecheck`        | `true`              | Run TypeScript checks     |
 | `run-test`             | `true`              | Run tests                 |
-| `run-build`            | `true`              | Run build                 |
+| `run-build`            | `false`             | Run build                 |
 | `lint-command`         | `pnpm lint`         | Lint command              |
 | `format-check-command` | `pnpm format:check` | Format check command      |
 | `typecheck-command`    | `pnpm typecheck`    | Typecheck command         |
@@ -133,13 +136,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astrale-os/config/.github/actions/publish/jsr@9bffee57d53b603b556bb545145fdde10f20a4c5
+        with:
+          package: .
 ```
 
 | Input               | Default  | Description                   |
 | ------------------- | -------- | ----------------------------- |
 | `node-version-file` | `.nvmrc` | Path to Node version file     |
 | `allow-slow-types`  | `true`   | Allow slow types in JSR       |
-| `working-directory` | `.`      | Directory containing jsr.json |
+| `package`           | required | Package directory to publish (relative to repo root) |
 
 ### publish/npm
 
@@ -160,7 +165,7 @@ jobs:
 | Input               | Default                      | Description                     |
 | ------------------- | ---------------------------- | ------------------------------- |
 | `node-version-file` | `.nvmrc`                     | Path to Node version file       |
-| `registry-url`      | `https://npm.pkg.github.com` | npm registry URL                |
+| `registry-url`      | `npm.pkg.github.com`         | npm registry URL                |
 | `scope`             | required                     | npm scope (e.g., `@astrale-os`) |
 | `access`            | `restricted`                 | Package access level            |
 | `token`             | required                     | npm registry token              |
