@@ -268,6 +268,11 @@ agent_ensure_skill() {
     agent_die "Skill $name for $agent is missing or incomplete after installation"
 }
 
+# Single definition of the line that loads env.sh, so every writer can detect its own past work.
+agent_environment_reference() {
+  printf '[ ! -f %q ] || . %q # Astrale agent setup\n' "$AGENT_ENV_FILE" "$AGENT_ENV_FILE"
+}
+
 agent_persist_environment() {
   mkdir -p "$AGENT_SETUP_HOME"
   local file line temporary
@@ -285,7 +290,7 @@ agent_persist_environment() {
     fi
   } > "$temporary"
   mv "$temporary" "$AGENT_ENV_FILE"
-  printf -v line '[ ! -f %q ] || . %q # Astrale agent setup' "$AGENT_ENV_FILE" "$AGENT_ENV_FILE"
+  line="$(agent_environment_reference)"
   for file in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.zprofile" "$HOME/.zshrc"; do
     if ! grep -Fqx "$line" "$file" 2>/dev/null; then
       if [[ "$file" == "$HOME/.bashrc" ]]; then
@@ -300,7 +305,8 @@ agent_persist_environment() {
       fi
     fi
   done
-  if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
+  # Several stages persist paths within one session; Claude applies this file to every Bash command.
+  if [[ -n "${CLAUDE_ENV_FILE:-}" ]] && ! grep -Fqx "$line" "$CLAUDE_ENV_FILE" 2>/dev/null; then
     printf '\n%s\n' "$line" >> "$CLAUDE_ENV_FILE"
   fi
   agent_log "Shell environment: $AGENT_ENV_FILE"
