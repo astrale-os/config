@@ -2,8 +2,8 @@
 # Shared source: astrale-os/config. Sync explicitly; never fetch setup code at runtime.
 set -euo pipefail
 
-AGENT_SETUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-AGENT_REPO_ROOT="$(cd "$AGENT_SETUP_DIR/../.." && pwd)"
+AGENT_SETUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+AGENT_REPO_ROOT="$(cd "$AGENT_SETUP_DIR/../.." && pwd -P)"
 AGENT_SETUP_HOME="${AGENT_SETUP_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/astrale-agent-setup}"
 AGENT_BIN="$AGENT_SETUP_HOME/bin"
 AGENT_TOOLS="$AGENT_SETUP_HOME/tools"
@@ -14,6 +14,51 @@ export CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS=1
 
 agent_log() { printf '[agent-setup] %s\n' "$*"; }
 agent_die() { printf '[agent-setup] ERROR: %s\n' "$*" >&2; exit 1; }
+
+agent_load_config() {
+  local configuration="$AGENT_SETUP_DIR/repo.config.sh" name
+  [[ -f "$configuration" ]] || agent_die "Missing repository configuration: $configuration"
+  # shellcheck source=/dev/null
+  source "$configuration"
+  for name in AGENT_SETUP_BROWSER AGENT_SETUP_ASTRALE_CLI; do
+    case "${!name:-}" in
+      0|1) export "${name?}" ;;
+      *) agent_die "$name must be 0 or 1 (got: ${!name:-unset})" ;;
+    esac
+  done
+}
+
+agent_resolve_harnesses() {
+  local requested="${AGENT_HARNESSES:-}" harness codex=0 claude=0
+  local -a targets
+  if [[ -z "$requested" ]]; then
+    if command -v codex >/dev/null 2>&1; then codex=1; fi
+    if command -v claude >/dev/null 2>&1; then claude=1; fi
+  else
+    [[ "$requested" != *$'\n'* ]] || agent_die 'AGENT_HARNESSES must be a single-line list'
+    read -r -a targets <<< "${requested//,/ }"
+    for harness in "${targets[@]-}"; do
+      case "$harness" in
+        codex) codex=1 ;;
+        claude) claude=1 ;;
+        *) agent_die "Unknown AGENT_HARNESSES target: $harness (expected codex or claude)" ;;
+      esac
+    done
+    [[ "$codex$claude" != 00 ]] || agent_die 'AGENT_HARNESSES contains no valid target'
+  fi
+  AGENT_HARNESSES=''
+  [[ "$codex" == 0 ]] || AGENT_HARNESSES=codex
+  [[ "$claude" == 0 ]] || AGENT_HARNESSES="${AGENT_HARNESSES:+$AGENT_HARNESSES,}claude"
+  export AGENT_HARNESSES
+}
+
+agent_check_repo() {
+  command -v git >/dev/null 2>&1 || agent_die 'Git is required to validate the checkout before setup'
+  [[ "$(git -C "$AGENT_REPO_ROOT" rev-parse --show-toplevel)" == "$AGENT_REPO_ROOT" ]] ||
+    agent_die "Not a standalone Git checkout root: $AGENT_REPO_ROOT"
+  [[ -f "$AGENT_REPO_ROOT/package.json" ]] || agent_die 'Missing package.json'
+  agent_node_version >/dev/null
+}
 
 agent_system_install() {
   if [[ "$(uname -s)" != Linux ]] || ! command -v apt-get >/dev/null 2>&1; then
@@ -124,7 +169,7 @@ agent_ensure_node() {
 agent_npm_install() {
   local prefix="$1"
   shift
-  # Browser downloads belong exclusively to env_1, including transitive postinstalls.
+  # Browser downloads belong to setup_browser_tools.sh, including transitive postinstalls.
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 PUPPETEER_SKIP_DOWNLOAD=true \
     npm install --global --prefix "$prefix" --no-audit --no-fund "$@"
 }
@@ -203,20 +248,22 @@ agent_check_browser() {
 agent_skill_directory() {
   case "$1" in
     codex) printf '%s/.agents/skills\n' "$HOME" ;;
-    claude-code) printf '%s/skills\n' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ;;
+    claude) printf '%s/skills\n' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ;;
     *) agent_die "Unsupported skills target: $1" ;;
   esac
 }
 
 agent_ensure_skill() {
-  local agent="$1" source="$2" name="$3" destination
+  local agent="$1" source="$2" name="$3" destination skills_target
   destination="$(agent_skill_directory "$agent")/$name"
   if node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$destination" "$name"; then
     agent_log "Reusing $name skill for $agent"
     return
   fi
   agent_ensure_cli skills skills
-  skills add "$source" --skill "$name" --agent "$agent" --global --copy --yes
+  skills_target="$agent"
+  [[ "$agent" != claude ]] || skills_target='claude-code'
+  skills add "$source" --skill "$name" --agent "$skills_target" --global --copy --yes
   node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$destination" "$name" ||
     agent_die "Skill $name for $agent is missing or incomplete after installation"
 }
@@ -261,15 +308,18 @@ agent_persist_environment() {
 
 agent_install_repo() {
   cd "$AGENT_REPO_ROOT"
-  [[ -f pnpm-lock.yaml ]] || agent_die "Missing pnpm-lock.yaml; generate and review it outside setup"
-  local before_head before_branch
+  local before_head before_branch before_lock=missing after_lock=missing result=0
   before_head="$(git rev-parse HEAD)"
   before_branch="$(git symbolic-ref -q HEAD || true)"
+  if [[ -f pnpm-lock.yaml ]]; then before_lock="$(git hash-object pnpm-lock.yaml)"; fi
   agent_ensure_pnpm
   # One install at this standalone workspace root. pnpm owns allowed native builds and prepare hooks.
-  if ! STANDALONE=true pnpm install --frozen-lockfile --prefer-offline; then
-    agent_die "Frozen install failed in $AGENT_REPO_ROOT. Fix the reported dependency/lockfile problem in a separate change; setup never regenerates the lockfile."
-  fi
+  STANDALONE=true pnpm install --no-frozen-lockfile --prefer-offline || result=$?
   [[ "$(git rev-parse HEAD)" == "$before_head" ]] || agent_die "HEAD changed during dependency installation"
   [[ "$(git symbolic-ref -q HEAD || true)" == "$before_branch" ]] || agent_die "Branch changed during dependency installation"
+  if [[ -f pnpm-lock.yaml ]]; then after_lock="$(git hash-object pnpm-lock.yaml)"; fi
+  if [[ "$before_lock" != "$after_lock" ]]; then
+    agent_log 'pnpm-lock.yaml changed during setup; review it before committing (setup does not commit)'
+  fi
+  [[ "$result" == 0 ]] || agent_die "Dependency installation failed in $AGENT_REPO_ROOT (exit $result)"
 }
