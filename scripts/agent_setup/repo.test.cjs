@@ -19,6 +19,10 @@ function fixture(t) {
   fs.mkdirSync(bin, { recursive: true })
   const env = {
     ...process.env,
+    // pnpm injects a module-resolution fallback to its own dependencies.
+    // Fixtures must resolve only their own packages, including missing-package checks.
+    NODE_OPTIONS: '',
+    NODE_PATH: '',
     HOME: home,
     AGENT_SETUP_HOME: storage,
     AGENT_HARNESSES: 'codex,claude',

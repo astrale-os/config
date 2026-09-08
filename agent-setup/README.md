@@ -1,6 +1,6 @@
 # Shared agent setup sources
 
-This directory owns the common runtime, browser and skill stages. Config and Domains consume
+This directory owns the common runtime, browser and skill stages. Config, Domains, Shell, Admin and CLI consume
 committed copies. Config's own setup lives in
 [`scripts/agent_setup`](../scripts/agent_setup/README.md); this directory is the distributed standard.
 
@@ -113,13 +113,13 @@ runtime or package manager, extend the shared contract in Config before adopting
 
 ## Repository defaults
 
-Config and Domains implement these defaults. Other repositories remain migration targets.
+Config, Domains, Shell, Admin and CLI implement these defaults. Other repositories remain migration targets.
 
 | Repositories | Browser tools and skills | Published Astrale CLI and skills |
 | --- | --- | --- |
 | workspace, domains, shell, admin | 1 | 1 |
-| gui, ui, prototype, cli | 1 | 0 |
-| sdk, kernel, datastore, config | 0 | 0 |
+| gui, ui, prototype | 1 | 0 |
+| cli, sdk, kernel, datastore, config | 0 | 0 |
 
 Use the Domains regression suite and a fresh Linux setup when changing common behavior.
 Also run syntax checks and the synchronization test here. New consumers must retain their own
