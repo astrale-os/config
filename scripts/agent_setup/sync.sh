@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 mode=copy
 if [[ "${1:-}" == --check ]]; then mode=check; shift; fi
 [[ "$#" -gt 0 ]] || agent_die 'Usage: bash scripts/agent_setup/sync.sh [--check] /path/to/repo [...]'
-files=(lib/common.sh lib/browser-check.cjs lib/skill-check.cjs setup.sh setup_runtimes.sh
+files=(lib/common.sh lib/browser.sh lib/browser-check.cjs lib/skill-check.cjs setup.sh setup_runtimes.sh
   setup_browser_tools.sh setup_skills.sh)
 for repository in "$@"; do
   [[ -f "$repository/package.json" ]] || agent_die "Not a repository root: $repository"

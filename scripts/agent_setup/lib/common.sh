@@ -235,9 +235,14 @@ agent_playwright_module() {
 agent_select_browser() {
   export AGENT_PLAYWRIGHT_MODULE
   AGENT_PLAYWRIGHT_MODULE="$(agent_playwright_module)"
-  export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$AGENT_SETUP_HOME/browsers}"
   export AGENT_BROWSER_EXECUTABLE_PATH
+  # Claude Cloud: preserve an explicit cache such as /opt/pw-browsers. Common: also reuse
+  # Playwright's default cache when it already contains the matching executable.
   AGENT_BROWSER_EXECUTABLE_PATH="$(node "$AGENT_SETUP_DIR/lib/browser-check.cjs" executable)"
+  if [[ -z "${PLAYWRIGHT_BROWSERS_PATH+x}" && ! -x "$AGENT_BROWSER_EXECUTABLE_PATH" ]]; then
+    export PLAYWRIGHT_BROWSERS_PATH="$AGENT_SETUP_HOME/browsers"
+    AGENT_BROWSER_EXECUTABLE_PATH="$(node "$AGENT_SETUP_DIR/lib/browser-check.cjs" executable)"
+  fi
   export CHROME_DEVTOOLS_EXECUTABLE_PATH="$AGENT_BROWSER_EXECUTABLE_PATH"
 }
 
@@ -283,7 +288,12 @@ agent_persist_environment() {
     # shellcheck disable=SC2016 # Expand PATH in the future shell, never capture the setup shell.
     printf 'export PATH=%q:%q:"$PATH"\n' "$AGENT_BIN" "$AGENT_TOOLS/bin"
     if [[ -n "${AGENT_BROWSER_EXECUTABLE_PATH:-}" ]]; then
-      printf 'export PLAYWRIGHT_BROWSERS_PATH=%q\n' "$PLAYWRIGHT_BROWSERS_PATH"
+      if [[ -n "${PLAYWRIGHT_BROWSERS_PATH+x}" ]]; then
+        printf 'export PLAYWRIGHT_BROWSERS_PATH=%q\n' "$PLAYWRIGHT_BROWSERS_PATH"
+      else
+        # A reused browser in Playwright's default cache must keep using that default.
+        printf 'unset PLAYWRIGHT_BROWSERS_PATH\n'
+      fi
       printf 'export AGENT_BROWSER_EXECUTABLE_PATH=%q\n' "$AGENT_BROWSER_EXECUTABLE_PATH"
       printf 'export CHROME_DEVTOOLS_EXECUTABLE_PATH=%q\n' "$CHROME_DEVTOOLS_EXECUTABLE_PATH"
       printf 'export AGENT_PLAYWRIGHT_MODULE=%q\n' "$AGENT_PLAYWRIGHT_MODULE"

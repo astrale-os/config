@@ -17,8 +17,14 @@ test('shared-source synchronization preserves consumer choices, integrations and
     'claude_session_start.sh',
     'verify.sh',
     'README.md',
+    'agent-setup.test.cjs',
+    'test_playwright_install.sh',
+    'lib/install-astrale.cjs',
   ]
-  for (const file of owned) fs.writeFileSync(path.join(target, file), `consumer-owned ${file}\n`)
+  for (const file of owned) {
+    fs.mkdirSync(path.dirname(path.join(target, file)), { recursive: true })
+    fs.writeFileSync(path.join(target, file), `consumer-owned ${file}\n`)
+  }
   const sync = (...args) =>
     spawnSync('bash', [path.join(__dirname, 'sync.sh'), ...args, root], { encoding: 'utf8' })
   const copied = sync()
@@ -31,12 +37,23 @@ test('shared-source synchronization preserves consumer choices, integrations and
     'setup_browser_tools.sh',
     'setup_skills.sh',
     'lib/common.sh',
+    'lib/browser.sh',
+    'lib/browser-check.cjs',
+    'lib/skill-check.cjs',
   ]) {
     assert.equal(
       fs.readFileSync(path.join(target, file), 'utf8'),
       fs.readFileSync(path.join(__dirname, file), 'utf8'),
     )
   }
+  assert.equal(sync('--check').status, 0)
+  // Omitting the new library must fail readiness; copy mode must restore it.
+  fs.rmSync(path.join(target, 'lib/browser.sh'))
+  const missing = sync('--check')
+  assert.notEqual(missing.status, 0)
+  assert.match(missing.stderr, /Out of sync: .*lib\/browser\.sh/)
+  assert.equal(fs.existsSync(path.join(target, 'lib/browser.sh')), false)
+  assert.equal(sync().status, 0)
   assert.equal(sync('--check').status, 0)
   fs.appendFileSync(path.join(target, 'setup.sh'), '\n# drift\n')
   const drift = sync('--check')

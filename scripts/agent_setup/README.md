@@ -3,10 +3,14 @@
 This directory owns the common runtime, browser and skill stages. The Domains repository is
 the migrated consumer; these entry points are templates, not Config's own repository setup.
 
+The shared browser stage includes Domains' cloud fixes: reuse healthy Playwright/Chromium
+caches, repair system libraries only when a launch reports them missing, and use temporary
+signed official sources for Ubuntu 24.04 images configured with snapshot archives.
+
 ```bash
 bash scripts/agent_setup/sync.sh ../domains
 bash scripts/agent_setup/sync.sh --check ../domains
-node --test scripts/agent_setup/sync.test.cjs
+node --test scripts/agent_setup/*.test.cjs
 ```
 
 Synchronization copies only the explicit shared file list. It preserves `repo.config.sh`,
@@ -14,6 +18,67 @@ Synchronization copies only the explicit shared file list. It preserves `repo.co
 Config and consumer changes. Startup never downloads shared setup code. Remove replaced
 `setup_env_1.sh`, `setup_env_2.sh` and the old per-agent orchestrators/skill scripts when migrating
 a consumer; sync does not delete arbitrary consumer files.
+
+## Adopt in a new repository
+
+This standard currently targets standalone Git checkouts using Node 26 and pnpm. For another
+runtime or package manager, extend the shared contract in Config before adopting it.
+
+1. Run `bash scripts/agent_setup/sync.sh /path/to/repo` from Config. Reuse the
+   copied orchestrator, runtime/browser/skill stages and shared helpers unchanged. Make shared
+   fixes in Config, then synchronize; consumer edits to synchronized files will be overwritten.
+2. Set the repository's exact Node version in `.nvmrc` and pnpm version in
+   `package.json#packageManager`. Create `scripts/agent_setup/repo.config.sh` with the two
+   defaults below, choosing `0` or `1` for each. Keep this file limited to options:
+
+   ```bash
+   export AGENT_SETUP_BROWSER="${AGENT_SETUP_BROWSER:-0}"
+   export AGENT_SETUP_ASTRALE_CLI="${AGENT_SETUP_ASTRALE_CLI:-0}"
+   ```
+
+3. Create `scripts/agent_setup/setup_repo.sh` for **all repository-specific preparation**:
+   extra prerequisites, generated files, required local builds and additional tool setup.
+   This minimal starting point installs one pnpm workspace and supports direct execution:
+
+   ```bash
+   #!/usr/bin/env bash
+   set -euo pipefail
+   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+   source "$SCRIPT_DIR/lib/common.sh"
+   agent_load_config
+   agent_resolve_harnesses
+   agent_check_repo
+   # Add read-only repository prerequisite checks here, without requiring installed runtimes.
+   case "${1:-}" in
+     --check) exit 0 ;;
+     '') ;;
+     *) agent_die 'Usage: setup_repo.sh [--check]' ;;
+   esac
+   agent_ensure_node
+   agent_ensure_bun
+   agent_install_repo
+   # Add repeatable repository preparation here; agent_install_repo leaves cwd at repo root.
+   if [[ "$AGENT_SETUP_BROWSER" == 1 ]]; then agent_select_browser; fi
+   agent_persist_environment
+   ```
+
+   `--check` must install/write nothing: the orchestrator calls it before the runtime stage.
+   Keep preparation safe to rerun and preserve existing Git work and native-build policy.
+   **Astrale-on needs implementation:** synchronization does not supply the CLI installer.
+   If enabling it, adapt Domains' guarded Astrale block in `setup_repo.sh` and its
+   `lib/install-astrale.cjs`, including both Astrale skills; otherwise keep the option at `0`.
+4. Create `verify.sh` to check readiness without installing anything. Adapt Domains' example:
+   replace its `issues`-specific Bun check with checks for your packages, and honor the same
+   options and selected agents. Add tests for your prerequisites and custom preparation.
+5. Wire the entry points into the repository's package scripts and agent configuration.
+   For Claude Cloud, adapt Domains' `claude_session_start.sh` and `.claude/settings.json`;
+   for Conductor, adapt `.conductor/settings.toml`. Preserve existing hooks/settings.
+   Follow [Domains' cloud configuration](https://github.com/astrale-os/domains/blob/main/scripts/agent_setup/README.md#cloud-and-conductor),
+   replacing the repository name and extending allowed domains for custom downloads.
+6. Check `sync.sh --check /path/to/repo`, run setup and verification in a fresh environment,
+   and rerun to check reuse and Git preservation. Document custom requirements in the consumer's
+   README and commit its scripts. Ordinary agent working instructions belong in its
+   `AGENTS.md`/`CLAUDE.md`; executable setup logic belongs in `setup_repo.sh`.
 
 ## Consumer contract
 
