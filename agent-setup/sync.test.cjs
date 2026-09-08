@@ -5,10 +5,12 @@ const path = require('node:path')
 const { spawnSync } = require('node:child_process')
 const { test } = require('node:test')
 
-test('shared-source synchronization preserves consumer choices, integrations and repository setup', (t) => {
+test('a repository can consume its own standard while preserving its custom setup', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent setup sync-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   fs.writeFileSync(path.join(root, 'package.json'), '{"private":true}')
+  const source = path.join(root, 'agent-setup')
+  fs.cpSync(__dirname, source, { recursive: true })
   const target = path.join(root, 'scripts/agent_setup')
   fs.mkdirSync(target, { recursive: true })
   const owned = [
@@ -26,7 +28,7 @@ test('shared-source synchronization preserves consumer choices, integrations and
     fs.writeFileSync(path.join(target, file), `consumer-owned ${file}\n`)
   }
   const sync = (...args) =>
-    spawnSync('bash', [path.join(__dirname, 'sync.sh'), ...args, root], { encoding: 'utf8' })
+    spawnSync('bash', [path.join(source, 'sync.sh'), ...args, root], { encoding: 'utf8' })
   const copied = sync()
   assert.equal(copied.status, 0, copied.stderr)
   for (const file of owned)
