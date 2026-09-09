@@ -21,6 +21,29 @@ export CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS=1
 agent_log() { printf '[agent-setup] %s\n' "$*"; }
 agent_die() { printf '[agent-setup] ERROR: %s\n' "$*" >&2; exit 1; }
 
+# Hash preparation inputs, not HEAD: ordinary source edits must not reinstall.
+# Git supplies tracked and non-ignored new files, including dirty manifest edits.
+# No Node/pnpm is needed here: this runs before the first runtime installation.
+agent_setup_fingerprint() {
+  (
+    cd "$AGENT_REPO_ROOT"
+    printf 'astrale-setup-v1\0%s\0%s\0' "$AGENT_SETUP_BROWSER" "$AGENT_SETUP_ASTRALE_CLI"
+    git ls-files --cached --others --exclude-standard -z -- \
+      'scripts/setup/**' 'package.json' '**/package.json' \
+      'pnpm-lock.yaml' '**/pnpm-lock.yaml' 'pnpm-workspace.yaml' '**/pnpm-workspace.yaml' \
+      '.npmrc' '**/.npmrc' '.pnpmfile.cjs' '**/.pnpmfile.cjs' \
+      '.nvmrc' '.node-version' '.bun-version' '**/.bun-version' \
+      'bun.lock' '**/bun.lock' 'bun.lockb' '**/bun.lockb' \
+      'patches/**' '**/patches/**' '.claude/settings.json' |
+      while IFS= read -r -d '' file; do
+        printf '%s\0' "$file"
+        if [[ -f "$file" ]]; then cat "$file"; else printf 'missing'; fi
+        printf '\0'
+      done
+  ) | if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi |
+    cut -d ' ' -f 1
+}
+
 agent_load_config() {
   local configuration="$AGENT_SETUP_DIR/repo.config.sh" name
   [[ -f "$configuration" ]] || agent_die "Missing repository configuration: $configuration"
