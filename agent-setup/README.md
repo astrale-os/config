@@ -154,3 +154,17 @@ is not a sandbox for package lifecycle scripts: checked-in build policies still 
 `setup_repo.sh --check` remains a separate read-only Git/manifest preflight; it
 does not mean the same thing as `AGENT_SETUP_TOOLS=check`. Only Workspace owns
 explicit latest-main refresh; standalone repositories always preserve their branch.
+
+## Claude prepared-checkout invalidation
+
+Consumer hooks keep a lock per physical checkout, but the success marker contains
+`agent_setup_fingerprint`, not a permanent `ready` flag. It hashes the effective
+browser/CLI flags and current (including dirty) setup scripts, package manifests,
+pnpm workspace/lock/config files, runtime pins, Bun lockfiles, patches and Claude
+settings. Ordinary source edits and branch names alone do not trigger installation.
+Legacy markers and missing shell environments trigger preparation again. A failed
+refresh removes the previous success marker; setup plus verification must succeed
+before publishing a new one. Fingerprints are computed under the checkout lock,
+and after successful preparation so legitimate lockfile updates remain reusable.
+Codex and local Conductor behavior are unchanged. Kernel and Workspace remain
+outside this rollout.
