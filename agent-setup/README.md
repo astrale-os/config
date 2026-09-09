@@ -1,8 +1,8 @@
 # Shared agent setup sources
 
-This directory owns the common runtime, browser and skill stages. Config, Domains, Shell, Admin, CLI, SDK, Kernel and Datastore consume
-committed copies. Config's own setup lives in
-[`scripts/setup/agent`](../scripts/setup/agent/README.md); this directory is the distributed standard.
+This directory owns the common runtime, browser and skill stages. Consumer repositories use committed copies. Config and SDK are the pilot consumers
+for the unified layout; other consumers retain their pinned standard until explicitly migrated. Config's own setup lives in
+[`scripts/setup`](../scripts/setup/README.md); this directory is the distributed standard.
 
 The shared browser stage includes Domains' cloud fixes: reuse healthy Playwright/Chromium
 caches, repair system libraries only when a launch reports them missing, and use temporary
@@ -30,7 +30,7 @@ runtime or package manager, extend the shared contract in Config before adopting
    copied orchestrator, runtime/browser/skill stages and shared helpers unchanged. Make shared
    fixes in Config, then synchronize; consumer edits to synchronized files will be overwritten.
 2. Set the repository's exact Node version in `.nvmrc` and pnpm version in
-   `package.json#packageManager`. Create `scripts/setup/agent/repo.config.sh` with the two
+   `package.json#packageManager`. Create `scripts/setup/repo.config.sh` with the two
    defaults below, choosing `0` or `1` for each. Keep this file limited to options:
 
    ```bash
@@ -38,7 +38,7 @@ runtime or package manager, extend the shared contract in Config before adopting
    export AGENT_SETUP_ASTRALE_CLI="${AGENT_SETUP_ASTRALE_CLI:-0}"
    ```
 
-3. Create `scripts/setup/agent/setup_repo.sh` for **all repository-specific preparation**:
+3. Create `scripts/setup/setup_repo.sh` for **all repository-specific preparation**:
    extra prerequisites, generated files, required local builds and additional tool setup.
    This minimal starting point installs one pnpm workspace and supports direct execution:
 
@@ -75,7 +75,7 @@ runtime or package manager, extend the shared contract in Config before adopting
 5. Wire the entry points into the repository's package scripts and agent configuration.
    For Claude Cloud, adapt Domains' `claude_session_start.sh` and `.claude/settings.json`;
    for Conductor, adapt `.conductor/settings.toml`. Preserve existing hooks/settings.
-   Follow [Domains' cloud configuration](https://github.com/astrale-os/domains/blob/main/scripts/setup/agent/README.md#cloud-and-conductor),
+   Follow [Domains' cloud configuration](https://github.com/astrale-os/domains/blob/main/scripts/setup/README.md#cloud-and-conductor),
    replacing the repository name and extending allowed domains for custom downloads.
 6. Check `sync.sh --check /path/to/repo`, run setup and verification in a fresh environment,
    and rerun to check reuse and Git preservation. Document custom requirements in the consumer's
@@ -106,14 +106,17 @@ runtime or package manager, extend the shared contract in Config before adopting
 - Setup Bun is independent of package-local locked Bun. Runtime preparation precedes JSON parsing.
   User-writable installation paths and shell profiles keep commands available in later shells.
 - The Claude hook is consumer-owned: it locks installation and writes a per-checkout success marker
-  only after setup and verification. Later calls only load paths. Codex Setup/Maintenance and direct
+  only after setup and verification. Later calls only load paths. Codex Setup (caching disabled, no Maintenance script) and direct
   calls always revalidate; they never consult Claude's marker.
 - Workspace recursive submodule preflight and its three install roots belong to that consumer.
   Migrating Domains does not migrate the Workspace or the other consumer repositories.
 
 ## Repository defaults
 
-Config, Domains, Shell, Admin, CLI, SDK, Kernel and Datastore implement these defaults. GUI, UI, Prototype and Workspace remain migration targets.
+The previous agent-setup migration covers Config, Domains, Shell, Admin, CLI, SDK,
+Datastore, GUI, UI and Prototype. Workspace setup is published, with full installation
+and real-cloud validation pending. Kernel has a separate migration in progress.
+The unified layout and tool policy are being validated first on Config and SDK.
 
 | Repositories | Browser tools and skills | Published Astrale CLI and skills |
 | --- | --- | --- |
@@ -124,3 +127,27 @@ Config, Domains, Shell, Admin, CLI, SDK, Kernel and Datastore implement these de
 Use the Domains regression suite and a fresh Linux setup when changing common behavior.
 Also run syntax checks and the synchronization test here. New consumers must retain their own
 native build policy and hooks, and update all callers before removing old entry points.
+
+## One setup, two tool policies
+
+Consumer entry point: `scripts/setup/setup.sh`. Shared sources remain here under
+`agent-setup/`; synchronize only reviewed consumers, update their callers and cloud
+environment commands at publication, and remove their old `scripts/setup/agent/`
+entry points. Existing consumers pinned to earlier commits are not migrated implicitly.
+
+- `AGENT_SETUP_TOOLS=install` is the default: reuse working tools, install/repair
+  missing tools, publish managed paths and selected skills as before.
+- `AGENT_SETUP_TOOLS=check` is selected by Conductor: inspect caller PATH, fail
+  clearly for missing tools or mismatched pinned versions, never install global
+  tools or modify user profiles/symlinks/skills. Harness selection is ignored in
+  this mode because personal skills are user-managed. Browser tools, when required,
+  must already launch successfully. No browser download or library repair is allowed.
+
+Both modes execute the same checkout preparation. They are not offline modes;
+package dependencies and necessary project artifacts still need preparation.
+Repository-specific installers must honor the tool policy as well. A tool policy
+is not a sandbox for package lifecycle scripts: checked-in build policies still apply.
+
+`setup_repo.sh --check` remains a separate read-only Git/manifest preflight; it
+does not mean the same thing as `AGENT_SETUP_TOOLS=check`. Only Workspace owns
+explicit latest-main refresh; standalone repositories always preserve their branch.

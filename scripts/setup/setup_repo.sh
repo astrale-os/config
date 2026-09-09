@@ -15,7 +15,9 @@ agent_ensure_node
 agent_ensure_bun
 agent_install_repo
 # Config ships configuration files and prebuilt JavaScript; no build is needed for setup.
-if [[ "$AGENT_SETUP_ASTRALE_CLI" == 1 ]]; then
+if [[ "$AGENT_SETUP_ASTRALE_CLI" == 1 && "$AGENT_SETUP_TOOLS" == check ]]; then
+  astrale --version >/dev/null 2>&1 || agent_die "Install the published Astrale CLI on your machine, then rerun setup"
+elif [[ "$AGENT_SETUP_ASTRALE_CLI" == 1 ]]; then
   if ! astrale --version >/dev/null 2>&1; then
     if "${ASTRALE_HOME:-$HOME/.astrale}/bin/astrale" --version >/dev/null 2>&1; then
       agent_link "${ASTRALE_HOME:-$HOME/.astrale}/bin/astrale" astrale
