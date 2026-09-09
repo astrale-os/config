@@ -11,7 +11,7 @@ test('a repository can consume its own standard while preserving its custom setu
   fs.writeFileSync(path.join(root, 'package.json'), '{"private":true}')
   const source = path.join(root, 'agent-setup')
   fs.cpSync(__dirname, source, { recursive: true })
-  const target = path.join(root, 'scripts/setup/agent')
+  const target = path.join(root, 'scripts/setup')
   fs.mkdirSync(target, { recursive: true })
   const owned = [
     'repo.config.sh',
