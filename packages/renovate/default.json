@@ -3,6 +3,7 @@
   "description": "Astrale OS default Renovate configuration",
   "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
   "rangeStrategy": "bump",
+  "minimumReleaseAge": "7 days",
   "labels": ["dependencies"],
   "packageRules": [
     {
