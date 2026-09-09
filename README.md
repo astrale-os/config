@@ -7,8 +7,8 @@ They are explicitly synchronized and committed in consumer repositories; setup n
 these shell scripts at runtime.
 
 Config consumes the same standard: its own options, preparation and verification live in
-[`scripts/agent_setup`](scripts/agent_setup/README.md). Run
-`bash scripts/agent_setup/setup.sh` to prepare this repository for agent work.
+[`scripts/setup/agent`](scripts/setup/agent/README.md). Run
+`bash scripts/setup/agent/setup.sh` to prepare this repository for agent work.
 
 Repository-level GitHub merge policy is declared and reconciled from
 [`github/repository-policy`](github/repository-policy/README.md).

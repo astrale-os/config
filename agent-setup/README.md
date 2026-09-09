@@ -1,8 +1,8 @@
 # Shared agent setup sources
 
-This directory owns the common runtime, browser and skill stages. Config, Domains, Shell, Admin and CLI consume
+This directory owns the common runtime, browser and skill stages. Config, Domains, Shell, Admin, CLI, SDK, Kernel and Datastore consume
 committed copies. Config's own setup lives in
-[`scripts/agent_setup`](../scripts/agent_setup/README.md); this directory is the distributed standard.
+[`scripts/setup/agent`](../scripts/setup/agent/README.md); this directory is the distributed standard.
 
 The shared browser stage includes Domains' cloud fixes: reuse healthy Playwright/Chromium
 caches, repair system libraries only when a launch reports them missing, and use temporary
@@ -30,7 +30,7 @@ runtime or package manager, extend the shared contract in Config before adopting
    copied orchestrator, runtime/browser/skill stages and shared helpers unchanged. Make shared
    fixes in Config, then synchronize; consumer edits to synchronized files will be overwritten.
 2. Set the repository's exact Node version in `.nvmrc` and pnpm version in
-   `package.json#packageManager`. Create `scripts/agent_setup/repo.config.sh` with the two
+   `package.json#packageManager`. Create `scripts/setup/agent/repo.config.sh` with the two
    defaults below, choosing `0` or `1` for each. Keep this file limited to options:
 
    ```bash
@@ -38,7 +38,7 @@ runtime or package manager, extend the shared contract in Config before adopting
    export AGENT_SETUP_ASTRALE_CLI="${AGENT_SETUP_ASTRALE_CLI:-0}"
    ```
 
-3. Create `scripts/agent_setup/setup_repo.sh` for **all repository-specific preparation**:
+3. Create `scripts/setup/agent/setup_repo.sh` for **all repository-specific preparation**:
    extra prerequisites, generated files, required local builds and additional tool setup.
    This minimal starting point installs one pnpm workspace and supports direct execution:
 
@@ -75,7 +75,7 @@ runtime or package manager, extend the shared contract in Config before adopting
 5. Wire the entry points into the repository's package scripts and agent configuration.
    For Claude Cloud, adapt Domains' `claude_session_start.sh` and `.claude/settings.json`;
    for Conductor, adapt `.conductor/settings.toml`. Preserve existing hooks/settings.
-   Follow [Domains' cloud configuration](https://github.com/astrale-os/domains/blob/main/scripts/agent_setup/README.md#cloud-and-conductor),
+   Follow [Domains' cloud configuration](https://github.com/astrale-os/domains/blob/main/scripts/setup/agent/README.md#cloud-and-conductor),
    replacing the repository name and extending allowed domains for custom downloads.
 6. Check `sync.sh --check /path/to/repo`, run setup and verification in a fresh environment,
    and rerun to check reuse and Git preservation. Document custom requirements in the consumer's
@@ -113,7 +113,7 @@ runtime or package manager, extend the shared contract in Config before adopting
 
 ## Repository defaults
 
-Config, Domains, Shell, Admin and CLI implement these defaults. Other repositories remain migration targets.
+Config, Domains, Shell, Admin, CLI, SDK, Kernel and Datastore implement these defaults. GUI, UI, Prototype and Workspace remain migration targets.
 
 | Repositories | Browser tools and skills | Published Astrale CLI and skills |
 | --- | --- | --- |

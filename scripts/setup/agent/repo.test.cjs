@@ -8,7 +8,7 @@ const { test } = require('node:test')
 function fixture(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'config setup-')))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
-  const scripts = path.join(root, 'scripts/agent_setup')
+  const scripts = path.join(root, 'scripts/setup/agent')
   fs.cpSync(__dirname, scripts, { recursive: true })
   fs.writeFileSync(path.join(root, '.nvmrc'), process.versions.node + '\n')
   fs.writeFileSync(path.join(root, 'package.json'), '{"packageManager":"pnpm@12.1.0"}')
@@ -131,7 +131,7 @@ test('Config verification requires its local ox exports, with no Domains package
 test('the configured Claude hook only loads paths locally', (t) => {
   const f = fixture(t)
   const settings = JSON.parse(
-    fs.readFileSync(path.join(__dirname, '../../.claude/settings.json'), 'utf8'),
+    fs.readFileSync(path.join(__dirname, '../../../.claude/settings.json'), 'utf8'),
   )
   const command = settings.hooks.SessionStart[0].hooks[0].command
   const envFile = path.join(f.root, 'claude.env')

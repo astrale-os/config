@@ -9,7 +9,7 @@ function fixture(t) {
   // Spaces in paths exercise the same entry points used by standalone clones and worktrees.
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'astrale setup test-')))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
-  const scripts = path.join(root, 'scripts/agent_setup')
+  const scripts = path.join(root, 'scripts/setup/agent')
   fs.cpSync(__dirname, scripts, { recursive: true })
   // Options belong to consumers, so a fresh consumer fixture supplies its own defaults.
   fs.writeFileSync(
@@ -43,7 +43,7 @@ function fixture(t) {
       'bash',
       [
         '-c',
-        'set -euo pipefail\nsource "$FIXTURE_ROOT/scripts/agent_setup/lib/common.sh"\n' + body,
+        'set -euo pipefail\nsource "$FIXTURE_ROOT/scripts/setup/agent/lib/common.sh"\n' + body,
       ],
       {
         cwd: os.tmpdir(),
@@ -138,7 +138,7 @@ for (const harness of ['claude', 'codex']) {
     const f = browserFixture(t)
     f.executable('apt-get', 'echo unexpected-apt >> "$TEST_LOG"; exit 99')
     const env = { AGENT_HARNESSES: harness, PLAYWRIGHT_BROWSERS_PATH: f.cache }
-    success(f.shell('bash "$FIXTURE_ROOT/scripts/agent_setup/setup_browser_tools.sh"', env))
+    success(f.shell('bash "$FIXTURE_ROOT/scripts/setup/agent/setup_browser_tools.sh"', env))
     const calls = fs.readFileSync(f.env.TEST_LOG, 'utf8')
     assert.equal(
       calls,
@@ -159,7 +159,7 @@ test('browser setup also preserves a working default Playwright cache when no pa
   const f = browserFixture(t)
   success(
     f.shell(
-      'unset PLAYWRIGHT_BROWSERS_PATH; bash "$FIXTURE_ROOT/scripts/agent_setup/setup_browser_tools.sh"',
+      'unset PLAYWRIGHT_BROWSERS_PATH; bash "$FIXTURE_ROOT/scripts/setup/agent/setup_browser_tools.sh"',
     ),
   )
   const restored = f.shell(
@@ -173,7 +173,7 @@ test('browser setup also preserves a working default Playwright cache when no pa
 test('browser setup never treats sandbox errors as missing libraries and stops on a failed download', (t) => {
   const f = browserFixture(t)
   f.executable('apt-get', 'echo unexpected-apt >> "$TEST_LOG"; exit 99')
-  const result = f.shell('bash "$FIXTURE_ROOT/scripts/agent_setup/setup_browser_tools.sh"', {
+  const result = f.shell('bash "$FIXTURE_ROOT/scripts/setup/agent/setup_browser_tools.sh"', {
     PLAYWRIGHT_BROWSERS_PATH: f.cache,
     TEST_BROWSER_FAILURE: 'sandbox',
   })
@@ -182,7 +182,7 @@ test('browser setup never treats sandbox errors as missing libraries and stops o
   assert.doesNotMatch(fs.readFileSync(f.env.TEST_LOG, 'utf8'), /unexpected-apt|install-deps|probe:/)
   fs.rmSync(f.browserExecutable)
   assert.equal(
-    f.shell('bash "$FIXTURE_ROOT/scripts/agent_setup/setup_browser_tools.sh"', {
+    f.shell('bash "$FIXTURE_ROOT/scripts/setup/agent/setup_browser_tools.sh"', {
       PLAYWRIGHT_BROWSERS_PATH: f.cache,
       TEST_DOWNLOAD_FAILURE: '1',
     }).status,
@@ -219,7 +219,7 @@ elif [[ "$*" == *' install '* ]]; then
 fi
 `,
       )
-      const result = f.shell('bash "$FIXTURE_ROOT/scripts/agent_setup/setup_browser_tools.sh"', {
+      const result = f.shell('bash "$FIXTURE_ROOT/scripts/setup/agent/setup_browser_tools.sh"', {
         PLAYWRIGHT_BROWSERS_PATH: f.cache,
         TEST_BROWSER_FAILURE: 'libraries',
         TEST_APT_HOST: host,
@@ -275,7 +275,7 @@ test('browser APT policy selects official sources only for active Ubuntu 24.04 s
   ]) {
     fs.writeFileSync(log, output)
     const result = f.shell(
-      `source "$FIXTURE_ROOT/scripts/agent_setup/lib/browser.sh"; agent_browser_use_official_sources ${osId} ${version} "$FIXTURE_ROOT/apt.log"`,
+      `source "$FIXTURE_ROOT/scripts/setup/agent/lib/browser.sh"; agent_browser_use_official_sources ${osId} ${version} "$FIXTURE_ROOT/apt.log"`,
     )
     assert.equal(result.status === 0, allowed, output)
   }
@@ -287,7 +287,7 @@ test('browser library routes only selected APT calls to signed Ubuntu sources', 
     'real-apt',
     'printf "%s\\n" "$@" >> "$TEST_LOG"; printf "APT_CONFIG=%s\\n" "${APT_CONFIG:-}" >> "$TEST_LOG"',
   )
-  const script = 'source "$FIXTURE_ROOT/scripts/agent_setup/lib/browser.sh"; '
+  const script = 'source "$FIXTURE_ROOT/scripts/setup/agent/lib/browser.sh"; '
   const env = { AGENT_BROWSER_APT_GET: apt, APT_CONFIG: '/existing/proxy.conf' }
   success(f.shell(script + 'agent_browser_apt_get install -y libatk1.0-0t64', env))
   const configured = fs.readFileSync(f.env.TEST_LOG, 'utf8')
@@ -330,7 +330,7 @@ test('browser library bounds index refresh and propagates installation failures'
   const f = fixture(t)
   const apt = f.executable('real-apt', 'exit 100')
   f.executable('timeout', 'printf "%s\\n" "$@" > "$TEST_LOG"; exit 124')
-  const script = 'source "$FIXTURE_ROOT/scripts/agent_setup/lib/browser.sh"; '
+  const script = 'source "$FIXTURE_ROOT/scripts/setup/agent/lib/browser.sh"; '
   const env = { AGENT_BROWSER_APT_GET: apt, AGENT_BROWSER_APT_UPDATE_TIMEOUT: '7' }
   const update = f.shell(script + 'agent_browser_apt_get update', env)
   assert.equal(update.status, 124)

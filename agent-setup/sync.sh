@@ -12,7 +12,7 @@ files=(lib/common.sh lib/browser.sh lib/browser-check.cjs lib/skill-check.cjs se
   setup_browser_tools.sh setup_skills.sh)
 for repository in "$@"; do
   [[ -f "$repository/package.json" ]] || sync_die "Not a repository root: $repository"
-  target="$(cd "$repository" && pwd)/scripts/agent_setup"
+  target="$(cd "$repository" && pwd)/scripts/setup/agent"
   [[ "$target" != "$SCRIPT_DIR" ]] || sync_die 'Cannot overwrite shared sources'
   for file in "${files[@]}"; do
     if [[ "$mode" == check ]]; then

@@ -17,7 +17,7 @@
     "format": "pnpm exec oxfmt --write .",
     "format:check": "pnpm exec oxfmt --check .",
     "test": "pnpm run test:agent-setup && pnpm test:action-pins && pnpm test:action-defaults && pnpm test:install-boundary && pnpm test:domains && pnpm test:github && pnpm test:jsr-publish && pnpm test:publish-packages && pnpm test:publish-mirror && pnpm -r --if-present run test",
-    "test:agent-setup": "pnpm run check:agent-setup-sync && node --test agent-setup/*.test.cjs scripts/agent_setup/*.test.cjs",
+    "test:agent-setup": "pnpm run check:agent-setup-sync && node --test agent-setup/*.test.cjs scripts/setup/agent/*.test.cjs",
     "test:action-pins": "node --test .github/actions/action-pins.test.mjs",
     "test:action-defaults": "node --test .github/actions/frozen-lockfile-defaults.test.mjs .github/actions/release/*.test.mjs",
     "test:install-boundary": "node --test .github/actions/install-dependencies.test.mjs",
@@ -29,10 +29,10 @@
     "github:repositories:check": "node github/repository-policy/reconcile.mjs --check",
     "github:repositories:apply": "node github/repository-policy/reconcile.mjs --apply",
     "prepare": "husky",
-    "setup": "bash scripts/agent_setup/setup.sh",
-    "setup:claude": "AGENT_HARNESSES=claude bash scripts/agent_setup/setup.sh",
-    "setup:codex": "AGENT_HARNESSES=codex bash scripts/agent_setup/setup.sh",
-    "check:agent-setup": "bash scripts/agent_setup/verify.sh",
+    "setup": "bash scripts/setup/agent/setup.sh",
+    "setup:claude": "AGENT_HARNESSES=claude bash scripts/setup/agent/setup.sh",
+    "setup:codex": "AGENT_HARNESSES=codex bash scripts/setup/agent/setup.sh",
+    "check:agent-setup": "bash scripts/setup/agent/verify.sh",
     "check:agent-setup-sync": "bash agent-setup/sync.sh --check ."
   },
   "devDependencies": {
