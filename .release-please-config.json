@@ -9,6 +9,7 @@
       "extra-files": ["jsr.json"]
     },
     "packages/ox": {},
+    "packages/agent-setup": {},
     "packages/renovate": {}
   },
   "changelog-sections": [

@@ -1,5 +1,10 @@
 # Shared agent setup sources
 
+The versioned-package successor is being piloted in
+[`packages/agent-setup`](../packages/agent-setup/README.md). This legacy synchronizer
+remains authoritative for consumers that have not migrated; do not remove it until
+the registry package and all replacement entry points have passed validation.
+
 This directory owns the common runtime, browser and skill stages. Consumer repositories use committed copies. The unified layout is published for Config,
 SDK, Domains, Shell, Admin, CLI, Datastore, GUI, UI and Prototype. Kernel and Workspace
 are excluded from this rollout and retain their existing pinned standards. Config's own setup lives in
