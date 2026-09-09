@@ -1,7 +1,8 @@
 # Shared agent setup sources
 
-This directory owns the common runtime, browser and skill stages. Consumer repositories use committed copies. Config and SDK are the pilot consumers
-for the unified layout; other consumers retain their pinned standard until explicitly migrated. Config's own setup lives in
+This directory owns the common runtime, browser and skill stages. Consumer repositories use committed copies. The unified layout is published for Config,
+SDK, Domains, Shell, Admin, CLI, Datastore, GUI, UI and Prototype. Kernel and Workspace
+are excluded from this rollout and retain their existing pinned standards. Config's own setup lives in
 [`scripts/setup`](../scripts/setup/README.md); this directory is the distributed standard.
 
 The shared browser stage includes Domains' cloud fixes: reuse healthy Playwright/Chromium
@@ -116,7 +117,9 @@ runtime or package manager, extend the shared contract in Config before adopting
 The previous agent-setup migration covers Config, Domains, Shell, Admin, CLI, SDK,
 Datastore, GUI, UI and Prototype. Workspace setup is published, with full installation
 and real-cloud validation pending. Kernel has a separate migration in progress.
-The unified layout and tool policy are being validated first on Config and SDK.
+The unified layout and tool policy were piloted on Config and SDK; the remaining
+standalone consumers listed above are migrated. Kernel and Workspace are
+explicitly excluded. See [rollout validation](VALIDATION.md) for checks and limits.
 
 | Repositories | Browser tools and skills | Published Astrale CLI and skills |
 | --- | --- | --- |
