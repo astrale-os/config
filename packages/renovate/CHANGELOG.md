@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/astrale-os/config/compare/renovate-config-v1.1.2...renovate-config-v1.2.0) (2026-09-09)
+
+
+### Features
+
+* **renovate:** require a seven-day release age ([#50](https://github.com/astrale-os/config/issues/50)) ([e762627](https://github.com/astrale-os/config/commit/e7626271aa7521309c19b9a1c681b97086ca85c9))
+
 ## [1.1.2](https://github.com/astrale-os/config/compare/renovate-config-v1.1.1...renovate-config-v1.1.2) (2026-07-11)
 
 
