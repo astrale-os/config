@@ -22,7 +22,8 @@ if (mode === '--executable') {
   console.log(executable)
 } else {
   // --version exercises the dynamic loader without requiring a display or an app build.
-  const args = process.getuid?.() === 0 ? ['--no-sandbox', '--version'] : ['--version']
+  const noSandbox = process.getuid?.() === 0 || process.env.GITHUB_ACTIONS === 'true'
+  const args = noSandbox ? ['--no-sandbox', '--version'] : ['--version']
   const result = spawnSync(executable, args, { encoding: 'utf8', timeout: 30_000 })
   if (result.error || result.status !== 0)
     throw new Error(`Electron cannot run: ${result.error?.message ?? ''}\n${result.stderr ?? ''}`)
