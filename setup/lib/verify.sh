@@ -12,7 +12,8 @@ agent_verify() {
   pnpm exec oxlint --version
   pnpm exec oxfmt --version
   repo_verify
-  node --input-type=module -e "await import('@astrale-os/ox/fmt'); await import('@astrale-os/ox/lint')"
+  # Some products own their Ox configuration instead of depending on Config's exports.
+  node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('package.json','utf8')); if(p.dependencies?.['@astrale-os/ox'] || p.devDependencies?.['@astrale-os/ox']) { await import('@astrale-os/ox/fmt'); await import('@astrale-os/ox/lint'); }"
   if [[ "$AGENT_SETUP_BROWSER" == 1 ]]; then
     agent_select_browser
     local tool harness skill
