@@ -66,3 +66,10 @@ repo_fingerprint() {
 repo_environment() {
   printf 'export KERNEL_SETUP_NATIVE_FALKORDB=%q KERNEL_SETUP_DOCKER=%q\n' "$KERNEL_SETUP_NATIVE_FALKORDB" "$KERNEL_SETUP_DOCKER"
 }
+
+repo_resume() {
+  if [[ "$KERNEL_SETUP_DOCKER" == 1 ]]; then
+    source "$PACKAGE_DIR/lib/kernel-docker.sh"
+    kernel_resume_docker
+  fi
+}

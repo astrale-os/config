@@ -286,3 +286,54 @@ test('Docker local policy cannot start an engine or pull an image', (t) => {
   assert.match(result.stderr, /Start Docker/)
   assert.doesNotMatch(result.stderr, /unexpected/)
 })
+
+test('Claude resumes services without reinstalling and retries a failed resume', (t) => {
+  if (spawnSync('sh', ['-c', 'command -v flock']).status !== 0)
+    return t.skip('Requires Linux flock')
+  const f = fixture(t)
+  f.env.CLAUDE_CODE_REMOTE = 'true'
+  f.env.AGENT_SETUP_TOOLS = 'install'
+  const body = `
+    source "$PACKAGE_ROOT/lib/claude.sh"
+    agent_prepare() {
+      printf 'prepare\\n' >> "$AGENT_REPO_ROOT/calls"
+      mkdir -p "$(dirname "$AGENT_ENV_FILE")"
+      printf 'export PREPARED_SERVICE=yes\\n' > "$AGENT_ENV_FILE"
+    }
+    repo_resume() {
+      [[ "$PREPARED_SERVICE" == yes ]]
+      printf 'resume\\n' >> "$AGENT_REPO_ROOT/calls"
+      [[ ! -f "$AGENT_REPO_ROOT/stopped" ]]
+    }
+    agent_claude
+  `
+  assert.equal(f.shell(body).status, 0)
+  fs.writeFileSync(path.join(f.root, 'stopped'), '')
+  assert.notEqual(f.shell(body).status, 0)
+  fs.unlinkSync(path.join(f.root, 'stopped'))
+  assert.equal(f.shell(body).status, 0)
+  assert.equal(fs.readFileSync(path.join(f.root, 'calls'), 'utf8'), 'prepare\nresume\nresume\n')
+})
+
+test('Docker resume restarts only its installed engine and never downloads', (t) => {
+  const f = fixture(t)
+  const bin = path.join(f.root, 'bin')
+  fs.mkdirSync(bin)
+  const script = (name, content) =>
+    fs.writeFileSync(path.join(bin, name), '#!/bin/sh\n' + content, { mode: 0o755 })
+  script(
+    'docker',
+    'echo "$*" >> "$AGENT_REPO_ROOT/docker-calls"\ncase "$1" in info) test -f "$AGENT_REPO_ROOT/running";; compose|image) exit 0;; *) exit 99;; esac\n',
+  )
+  script('dockerd', 'touch "$AGENT_REPO_ROOT/running"\n')
+  script('id', 'echo 0\n')
+  f.env.PATH = bin + path.delimiter + process.env.PATH
+  f.env.AGENT_SETUP_TOOLS = 'install'
+  const body =
+    'source "$PACKAGE_ROOT/lib/kernel-docker.sh"; kernel_docker_image(){ echo pinned-image; }; kernel_resume_docker'
+  const result = f.shell(body)
+  assert.equal(result.status, 0, result.stderr)
+  assert.ok(fs.existsSync(path.join(f.root, 'running')))
+  assert.doesNotMatch(fs.readFileSync(path.join(f.root, 'docker-calls'), 'utf8'), /pull/)
+  assert.equal(f.shell(body).status, 0)
+})

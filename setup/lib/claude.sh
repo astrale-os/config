@@ -9,7 +9,9 @@ agent_claude() {
       flock -x -w 600 9 || agent_die 'Timed out waiting for setup'
       fingerprint="$(agent_setup_fingerprint)"
       if [[ -r "$AGENT_ENV_FILE" && -f "$marker" && "$(cat "$marker")" == "$fingerprint" ]]; then
-        agent_log 'Prepared checkout: loading paths only' >&2
+        agent_log 'Prepared checkout: loading paths and resuming services' >&2
+        source "$AGENT_ENV_FILE"
+        if declare -F repo_resume >/dev/null; then repo_resume >&2; fi
       else
         rm -f "$marker"
         agent_prepare >&2

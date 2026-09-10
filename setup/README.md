@@ -32,7 +32,8 @@ Copy `bootstrap/setup.sh` to the consumer's `scripts/setup/setup.sh`.
 Codex: disable cache, use `AGENT_HARNESSES=codex bash scripts/setup/setup.sh` as
 Setup, leave Maintenance empty. Claude: leave environment Setup empty and invoke
 `claude` from SessionStart. Remote hooks lock preparation and rerun when setup inputs
-change; otherwise they load paths. Failed preparation leaves no success marker.
+change; otherwise they load paths and resume required services. Docker restart reuses its installed
+engine and pinned image without installation or downloads. Failed preparation leaves no success marker.
 Local hooks only load prepared paths. Conductor selects `AGENT_SETUP_TOOLS=check`;
 this permits archive/dependency downloads but never installs machine tools.
 

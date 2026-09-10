@@ -88,3 +88,5 @@ repo_fingerprint() {
 repo_environment() {
   printf 'export KERNEL_SETUP_NATIVE_FALKORDB=%q KERNEL_SETUP_DOCKER=%q\n' "$KERNEL_SETUP_NATIVE_FALKORDB" "$KERNEL_SETUP_DOCKER"
 }
+
+repo_resume() { workspace_profile kernel resume; }
