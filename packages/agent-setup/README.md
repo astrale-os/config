@@ -85,3 +85,6 @@ missing `libgtk-3.so.0` is repaired through the same bounded, signed APT path as
 Chromium. Read-only verification and local check mode never install that library.
 Application UI smoke tests still require a display (or Xvfb) and the product's
 own build/start commands; this readiness check does not replace them.
+
+The Electron version probe follows the same root/GitHub Actions sandbox policy
+as the isolated Chrome DevTools probe; local users keep the normal sandbox.
