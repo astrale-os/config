@@ -11,8 +11,12 @@ repo_preflight() {
   done
 }
 
-repo_prepare() { :; }
+repo_prepare() {
+  # The Domain's local SSH authority tests generate disposable Ed25519 keys.
+  if ! command -v ssh-keygen >/dev/null 2>&1; then agent_system_install openssh-client; fi
+}
 repo_verify() {
+command -v ssh-keygen >/dev/null || agent_die "Missing ssh-keygen (OpenSSH client)"
 pnpm exec tsc --version
 # Admin has no package-local Bun dependency. Check the tools each package actually declares;
 # console/test frontends use Vite, only some packages use Vitest, and Workers use Wrangler.
