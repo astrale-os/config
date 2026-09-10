@@ -70,8 +70,8 @@ Consumers commit `VERSION SHA256` in `setup.lock`; the bootstrap downloads
 `https://github.com/astrale-os/config/releases/download/setup-vVERSION/astrale-setup-VERSION.tar.gz`.
 It never resolves latest. Keep GitHub and its release asset redirect host
 `release-assets.githubusercontent.com` accessible in cloud environments.
-A public asset was verified from Claude SDK without Config attached; the full
-automatic bootstrap remains a separate rollout gate.
+A public asset was verified from Claude SDK without Config attached. Automatic
+bootstrap validation for the SDK and GUI pilots is complete; details follow below.
 
 The isolated Chrome DevTools readiness probe uses `--no-sandbox` for root cloud
 VMs and GitHub Actions runners, where downloaded Chromium cannot create its
@@ -88,3 +88,26 @@ own build/start commands; this readiness check does not replace them.
 
 The Electron version probe follows the same root/GitHub Actions sandbox policy
 as the isolated Chrome DevTools probe; local users keep the normal sandbox.
+
+## Pilot validation (2026-09-10)
+
+SDK and GUI archive consumers are merged on their respective main branches.
+SDK pins `setup-v0.1.0`; GUI pins `setup-v0.1.3`, which has been promoted from
+prerelease. Published archives and their digests remain immutable.
+
+- SDK: fresh Linux installation and automatic Codex/Claude preparation passed,
+  including readiness, lint and typecheck without manually rerunning setup.
+  Product tests still have four failures in Codex and five in Claude; their cause
+  is not established. GitHub CI passed. See the
+  [SDK validation report](https://github.com/astrale-os/sdk/blob/main/scripts/setup/README.md#pilot-validation-2026-09-10).
+- GUI: fresh Linux installation verified GTK repair. Both clouds automatically
+  verified archive 0.1.2, Electron and all three browsers; earlier cloud product
+  runs passed all 144 tests plus lint and typecheck. Claude also verified automatic
+  preparation after a changed archive pin. Archive 0.1.3 adds the GitHub runner
+  condition to the Electron probe and passed actual archive installation and
+  Electron verification in GitHub CI. Application display/end-to-end tests remain
+  separate. See the
+  [GUI validation report](https://github.com/astrale-os/gui/blob/main/scripts/setup/README.md#validation-2026-09-10).
+
+Other repository profiles and Workspace composition still require migration and
+qualification before the legacy synchronizer can be removed.

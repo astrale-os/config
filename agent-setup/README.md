@@ -1,13 +1,14 @@
 # Shared agent setup sources
 
-The versioned-archive successor is being piloted in
+SDK and GUI now consume the versioned-archive successor in
 [`packages/agent-setup`](../packages/agent-setup/README.md). This legacy synchronizer
 remains authoritative for consumers that have not migrated; do not remove it until
 the release archive and all replacement entry points have passed validation.
 
-This directory owns the common runtime, browser and skill stages. Consumer repositories use committed copies. The unified layout is published for Config,
-SDK, Domains, Shell, Admin, CLI, Datastore, GUI, UI and Prototype. Kernel and Workspace
-are excluded from this rollout and retain their existing pinned standards. Config's own setup lives in
+This directory owns the legacy common runtime, browser and skill stages. Config,
+Domains, Shell, Admin, CLI, Datastore, UI and Prototype still use committed copies.
+Do not synchronize these files into SDK or GUI: their setup launchers consume the archive.
+Kernel and Workspace migration is tracked separately. Config's own setup lives in
 [`scripts/setup`](../scripts/setup/README.md); this directory is the distributed standard.
 
 The shared browser stage includes Domains' cloud fixes: reuse healthy Playwright/Chromium
@@ -23,7 +24,7 @@ node --test agent-setup/*.test.cjs
 Synchronization copies only the explicit shared file list. It preserves `repo.config.sh`,
 `setup_repo.sh`, Claude hooks, verification, tests and documentation. Review and commit both
 Config and consumer changes. CI checks Config's copies with `pnpm check:agent-setup-sync`.
-Startup never downloads shared setup code. Remove replaced
+For these legacy consumers, startup never downloads shared setup code. Remove replaced
 `setup_env_1.sh`, `setup_env_2.sh` and the old per-agent orchestrators/skill scripts when migrating
 a consumer; sync does not delete arbitrary consumer files.
 

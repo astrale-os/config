@@ -25,8 +25,10 @@ Browser tools and Astrale CLI/skills are **disabled by default**. To enable eith
 - **Codex Cloud:** select `astrale-os/config`, disable container caching, and put
   `AGENT_HARNESSES=codex bash scripts/setup/setup.sh` in Setup script only.
 - **Claude Cloud:** select `astrale-os/config` and leave Setup script empty. The committed
-  `.claude/settings.json` runs setup and verification once per physical checkout, then restores
-  paths on later sessions. After dependency/option changes, rerun setup explicitly.
+  `.claude/settings.json` runs setup and verification once per checkout and input fingerprint,
+  then restores paths on later sessions. Changes to setup scripts, dependency manifests,
+  runtime pins or setup options automatically trigger preparation at the next SessionStart.
+  The success marker is written only after setup and verification pass.
   The hook needs network access: retain the default package-manager allowlist and allow Node
   downloads at `nodejs.org` plus the system package mirrors. If enabling browser or Astrale tools,
   use the [extended allowlist](https://github.com/astrale-os/domains/blob/main/scripts/setup/README.md#cloud-and-conductor).
