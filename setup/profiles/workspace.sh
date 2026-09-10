@@ -61,7 +61,8 @@ repo_verify() {
     [[ -f "$repo/node_modules/.modules.yaml" ]] || agent_die "Missing dependency root: $repo"
   done
   for repo in config sdk shell admin datastore cli kernel ui prototype domains gui; do
-    [[ -d "$repo/node_modules" ]] || agent_die "Missing product dependencies: $repo"
+    # Config contributes only packages/ox to the integrated workspace. Let each
+    # profile verify its actual tools/artifacts instead of assuming a root node_modules.
     workspace_profile "$repo" verify
   done
   for repo in cli kernel prototype; do
