@@ -1,13 +1,13 @@
 {
   "name": "@astrale-os/agent-setup",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Versioned environment preparation for Astrale repositories",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/astrale-os/config.git",
-    "directory": "packages/agent-setup"
+    "directory": "setup"
   },
   "files": [
     "run.sh",

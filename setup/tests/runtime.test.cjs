@@ -111,3 +111,19 @@ test('Claude prepares once, refreshes changed inputs and never caches a failure'
   assert.equal(f.shell(body).status, 0)
   assert.equal(fs.readFileSync(path.join(f.root, 'calls'), 'utf8'), 'prepare\nprepare\nprepare\n')
 })
+
+test('Config profile accepts its own tree and rejects missing ox or extra tools', (t) => {
+  const f = fixture(t)
+  fs.writeFileSync(
+    path.join(f.root, 'scripts/setup/repo.sh'),
+    'export AGENT_SETUP_PROFILE=config AGENT_SETUP_BROWSER=0 AGENT_SETUP_ASTRALE_CLI=0\n',
+  )
+  fs.writeFileSync(path.join(f.root, 'pnpm-workspace.yaml'), "packages: ['packages/*']\n")
+  fs.mkdirSync(path.join(f.root, 'packages/ox'), { recursive: true })
+  fs.writeFileSync(path.join(f.root, 'packages/ox/package.json'), '{}')
+  const check = 'source "$PACKAGE_ROOT/profiles/config.sh"; repo_preflight'
+  assert.equal(f.shell(check).status, 0)
+  assert.match(f.shell('AGENT_SETUP_BROWSER=1; ' + check).stderr, /neither global browsers/)
+  fs.unlinkSync(path.join(f.root, 'packages/ox/package.json'))
+  assert.match(f.shell(check).stderr, /Missing local ox/)
+})

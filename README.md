@@ -2,14 +2,10 @@
 
 Shared configurations and composite actions for Astrale TypeScript monorepos.
 
-Shared agent setup sources live in [`agent-setup`](agent-setup/README.md).
-Existing consumers use explicitly synchronized copies. The successor in
-[`packages/agent-setup`](packages/agent-setup/README.md) distributes a checked archive
-through Config GitHub releases; SDK and GUI are its first pilots.
-
-Config consumes the same standard: its own options, preparation and verification live in
-[`scripts/setup`](scripts/setup/README.md). Run
-`bash scripts/setup/setup.sh` to prepare this repository for agent work.
+Shared environment preparation lives in [`setup/`](setup/README.md) and is distributed
+as a pinned GitHub release archive. Config consumes it through
+[`scripts/setup/`](scripts/setup/README.md), like other repositories.
+Run `bash scripts/setup/setup.sh` to prepare this repository.
 
 Repository-level GitHub merge policy is declared and reconciled from
 [`github/repository-policy`](github/repository-policy/README.md).

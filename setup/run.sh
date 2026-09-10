@@ -6,7 +6,7 @@ PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$PACKAGE_DIR/lib/common.sh"
 agent_load_config
 agent_resolve_harnesses
-case "${AGENT_SETUP_PROFILE:-}" in sdk|gui) ;; *) agent_die 'Unsupported setup profile';; esac
+case "${AGENT_SETUP_PROFILE:-}" in config|sdk|gui) ;; *) agent_die 'Unsupported setup profile';; esac
 source "$PACKAGE_DIR/profiles/$AGENT_SETUP_PROFILE.sh"
 source "$PACKAGE_DIR/lib/verify.sh"
 agent_prepare() {

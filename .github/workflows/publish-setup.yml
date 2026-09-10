@@ -20,15 +20,15 @@ jobs:
           package-manager-cache: false
       - name: Validate and pack
         run: |
-          find packages/agent-setup -name '*.sh' -exec bash -n {} \;
-          node --test packages/agent-setup/tests/*.test.cjs
-          bash packages/agent-setup/pack.sh "$RUNNER_TEMP/setup-release"
+          find setup -name '*.sh' -exec bash -n {} \;
+          node --test setup/tests/*.test.cjs
+          bash setup/pack.sh "$RUNNER_TEMP/setup-release"
       - name: Publish a new immutable-version candidate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="$(node -p 'require("./packages/agent-setup/package.json").version')"
+          version="$(node -p 'require("./setup/package.json").version')"
           gh release create "setup-v$version" "$RUNNER_TEMP/setup-release/astrale-setup-$version.tar.gz" "$RUNNER_TEMP/setup-release/astrale-setup-$version.tar.gz.sha256" \
             --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "Astrale setup $version" \
-            --notes "Pinned setup archive from $GITHUB_SHA. Candidate pending automatic SDK and GUI cloud validation."
+            --notes "Pinned setup archive from $GITHUB_SHA. Candidate pending qualification of affected consumer profiles."

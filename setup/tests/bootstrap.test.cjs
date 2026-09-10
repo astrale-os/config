@@ -19,7 +19,7 @@ function fixture(t) {
   const archive = path.join(root, 'source.tgz')
   assert.equal(spawnSync('tar', ['-czf', archive, '-C', path.dirname(pkg), 'package']).status, 0)
   const hash = createHash('sha256').update(fs.readFileSync(archive)).digest('hex')
-  fs.writeFileSync(path.join(scripts, 'setup.lock'), `0.1.0 ${hash}\n`)
+  fs.writeFileSync(path.join(scripts, 'setup.lock'), `99.0.0 ${hash}\n`)
   fs.writeFileSync(
     path.join(bin, 'curl'),
     '#!/bin/bash\nprintf "%s\\n" "$@" >> "$URL_ARGS"\necho download >> "$CALLS"\nwhile [[ "$1" != -o ]]; do shift; done\ncp "$SOURCE_ARCHIVE" "$2"\n',
@@ -58,7 +58,7 @@ test('bootstrap downloads once, uses explicit repo path and verifies cached byte
     fs
       .readFileSync(f.env.URL_ARGS, 'utf8')
       .includes(
-        'https://github.com/astrale-os/config/releases/download/setup-v0.1.0/astrale-setup-0.1.0.tar.gz',
+        'https://github.com/astrale-os/config/releases/download/setup-v99.0.0/astrale-setup-99.0.0.tar.gz',
       ),
   )
   assert.equal(fs.readFileSync(f.env.RESULT, 'utf8'), `${f.repo}\nprepare\n`)
@@ -66,7 +66,7 @@ test('bootstrap downloads once, uses explicit repo path and verifies cached byte
   assert.equal(result.status, 0, result.stderr)
   assert.equal(fs.readFileSync(f.env.CALLS, 'utf8'), 'download\n')
   fs.writeFileSync(
-    path.join(f.env.XDG_CACHE_HOME, 'astrale-agent-setup/0.1.0', f.hash, 'package.tgz'),
+    path.join(f.env.XDG_CACHE_HOME, 'astrale-agent-setup/99.0.0', f.hash, 'package.tgz'),
     'corrupt',
   )
   assert.notEqual(f.run('verify').status, 0)
