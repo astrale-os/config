@@ -2,8 +2,7 @@
 
 Config owns the implementation distributed as a versioned GitHub release archive.
 Consumers keep a launcher, a profile and an exact version/SHA-256 in `scripts/setup/`.
-Supported profiles: `config`, `sdk`, `gui`. Config and SDK disable browsers and the
-Astrale CLI; GUI enables browsers and prepares Electron, without the Astrale CLI.
+Each profile declares the tools, preparation and checks required by its repository.
 
 ## Structure and ownership
 

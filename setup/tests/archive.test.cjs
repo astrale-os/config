@@ -25,6 +25,7 @@ test('release archive contains runnable entrypoints and its digest matches the d
     'run.sh',
     'bootstrap/setup.sh',
     'profiles/config.sh',
+    'profiles/cli.sh',
     'profiles/sdk.sh',
     'profiles/gui.sh',
     'lib/common.sh',

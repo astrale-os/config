@@ -127,3 +127,52 @@ test('Config profile accepts its own tree and rejects missing ox or extra tools'
   fs.unlinkSync(path.join(f.root, 'packages/ox/package.json'))
   assert.match(f.shell(check).stderr, /Missing local ox/)
 })
+
+test('CLI preflight rejects an invalid Bun pin or an incomplete checkout before preparation', (t) => {
+  const f = fixture(t)
+  fs.writeFileSync(
+    path.join(f.root, 'scripts/setup/repo.sh'),
+    'export AGENT_SETUP_PROFILE=cli AGENT_SETUP_BROWSER=0 AGENT_SETUP_ASTRALE_CLI=0\n',
+  )
+  for (const name of [
+    'pnpm-workspace.yaml',
+    'studio/package.json',
+    'studio/e2e/fixture/package.json',
+    'studio/e2e/fixture/peer/package.json',
+    'scripts/build-embedded-assets.ts',
+  ]) {
+    fs.mkdirSync(path.dirname(path.join(f.root, name)), { recursive: true })
+    fs.writeFileSync(path.join(f.root, name), '{}')
+  }
+  fs.writeFileSync(path.join(f.root, '.bun-version'), '1.4.0\n')
+  const check = 'source "$PACKAGE_ROOT/profiles/cli.sh"; repo_preflight'
+  assert.equal(f.shell(check).status, 0)
+  fs.writeFileSync(path.join(f.root, '.bun-version'), 'latest\n')
+  assert.match(f.shell(check).stderr, /exact Bun version/)
+  fs.writeFileSync(path.join(f.root, '.bun-version'), '1.4.0\n')
+  fs.unlinkSync(path.join(f.root, 'studio/package.json'))
+  assert.match(f.shell(check).stderr, /Incomplete CLI checkout/)
+})
+
+test('CLI verification never regenerates missing or stale assets', (t) => {
+  const f = fixture(t)
+  fs.mkdirSync(path.join(f.root, 'studio/node_modules'), { recursive: true })
+  const check = `cd "$AGENT_REPO_ROOT"; source "$PACKAGE_ROOT/profiles/cli.sh";
+    pnpm() { :; }
+    bun() { printf '%s\\n' "$*" >> "$AGENT_REPO_ROOT/bun-calls"; return 42; }
+    repo_verify`
+  assert.match(f.shell(check).stderr, /Embedded assets are missing/)
+  assert.equal(fs.existsSync(path.join(f.root, 'bun-calls')), false)
+  for (const name of [
+    'src/generated/embedded-assets.ts',
+    'viewer/dist/index.html',
+    'studio/client/dist/index.html',
+  ]) {
+    fs.mkdirSync(path.dirname(path.join(f.root, name)), { recursive: true })
+    fs.writeFileSync(path.join(f.root, name), 'fixture')
+  }
+  assert.equal(f.shell(check).status, 42)
+  const calls = fs.readFileSync(path.join(f.root, 'bun-calls'), 'utf8')
+  assert.match(calls, /embeddedAssetCacheIsCurrent/)
+  assert.doesNotMatch(calls, /bin\/astrale.ts|bin\/run.ts|assets:ensure/)
+})
