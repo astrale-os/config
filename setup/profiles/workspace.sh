@@ -15,6 +15,8 @@ repo_checkout() {
 }
 repo_dependencies() {
   local root="$AGENT_REPO_ROOT" repo version prefix
+  # Publish the root pnpm link for lifecycle scripts and subsequent sessions.
+  agent_ensure_pnpm
   # Warm exact product pnpm versions without replacing the Workspace activation link.
   for repo in . admin cli config datastore domains gui kernel prototype sdk shell ui ui/domain; do
     version="$(AGENT_REPO_ROOT="$root/$repo" agent_pnpm_version)"

@@ -85,5 +85,5 @@ workspace_pnpm() {
     binary="$(type -P pnpm)"
     [[ "$(cd "$directory" && npm_config_manage_package_manager_versions=false "$binary" --version)" == "$version" ]] || agent_die "Missing pnpm $version for $directory"
   fi
-  (cd "$directory" && npm_config_manage_package_manager_versions=false "$binary" "$@")
+  (cd "$directory" && PATH="$(dirname "$binary"):$PATH" npm_config_manage_package_manager_versions=false "$binary" "$@")
 }

@@ -127,3 +127,27 @@ test('an unexpected repository is refused before changing Git state', (t) => {
   assert.match(r.stderr, /Unreviewed submodule path/)
   assert.equal(git(path.join(f.root, 'admin'), 'rev-parse', 'HEAD'), f.pinned)
 })
+
+test('product pnpm is available to nested lifecycle commands', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-pnpm-test-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const product = path.join(dir, 'product')
+  const bin = path.join(dir, 'tools/pnpm/12.1.0/bin')
+  fs.mkdirSync(product, { recursive: true })
+  fs.mkdirSync(bin, { recursive: true })
+  fs.writeFileSync(
+    path.join(product, 'package.json'),
+    JSON.stringify({ packageManager: 'pnpm@12.1.0' }),
+  )
+  fs.writeFileSync(
+    path.join(bin, 'pnpm'),
+    '#!/bin/sh\nif [ "$1" = nested ]; then echo nested-ok; else sh -c "pnpm nested"; fi\n',
+    { mode: 0o755 },
+  )
+  const result = run(product, 'bash', ['-c', 'source "$LIBRARY"; workspace_pnpm "$PWD" install'], {
+    LIBRARY: library,
+    AGENT_SETUP_HOME: path.join(dir, 'tools'),
+  })
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout.trim(), 'nested-ok')
+})
