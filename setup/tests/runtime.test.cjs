@@ -222,3 +222,67 @@ test('Admin preflight checks all package manifests without executing package too
   fs.unlinkSync(path.join(f.root, 'test/web/package.json'))
   assert.match(f.shell(check).stderr, /missing test\/web\/package.json/)
 })
+
+function nativeFixture(f) {
+  const { createHash } = require('node:crypto')
+  const digest = (s) => createHash('sha256').update(s).digest('hex')
+  const platform = `${process.platform}-${process.arch}`
+  const redis = { version: '8.6.3', url: 'fixture', sha256: digest('archive') }
+  const module = { url: 'fixture', sha256: digest('module') }
+  fs.mkdirSync(path.join(f.root, 'scripts/integration'), { recursive: true })
+  fs.writeFileSync(
+    path.join(f.root, 'scripts/integration/native-pins.json'),
+    JSON.stringify({ redis, modules: { [platform]: module } }),
+  )
+  const directory = path.join(f.root, '.context/falkordb-native')
+  fs.mkdirSync(path.join(directory, 'redis-8.6.3/src'), { recursive: true })
+  fs.writeFileSync(path.join(directory, 'redis.tar.gz'), 'archive')
+  fs.writeFileSync(path.join(directory, 'falkordb.so'), 'module')
+  fs.writeFileSync(
+    path.join(directory, 'sources.json'),
+    JSON.stringify({ platform, redis, module }),
+  )
+  fs.writeFileSync(
+    path.join(directory, 'redis-8.6.3/src/redis-server'),
+    '#!/bin/sh\necho "Redis server v=8.6.3 fixture"\n',
+    { mode: 0o755 },
+  )
+  return directory
+}
+
+test('native tool admission uses the supplied checkout and preserves corrupt evidence', (t) => {
+  const f = fixture(t),
+    directory = nativeFixture(f)
+  const run = () =>
+    spawnSync(process.execPath, [path.join(packageRoot, 'lib/kernel-native.cjs'), f.root], {
+      encoding: 'utf8',
+      cwd: '/',
+    })
+  assert.equal(run().status, 0)
+  fs.writeFileSync(path.join(directory, 'falkordb.so'), 'tampered')
+  assert.match(run().stderr, /digest mismatch/)
+  assert.equal(fs.readFileSync(path.join(directory, 'falkordb.so'), 'utf8'), 'tampered')
+})
+test('Kernel provider pins and selection invalidate the shared Claude fingerprint', (t) => {
+  const f = fixture(t)
+  const run = (flag = '0') =>
+    f.shell(
+      'source "$PACKAGE_ROOT/profiles/kernel.sh"; KERNEL_SETUP_NATIVE_FALKORDB=' +
+        flag +
+        '; KERNEL_SETUP_DOCKER=0; agent_setup_fingerprint',
+    )
+  const first = run()
+  assert.equal(first.status, 0, first.stderr)
+  assert.notEqual(run('1').stdout, first.stdout)
+  fs.mkdirSync(path.join(f.root, 'scripts/integration'), { recursive: true })
+  fs.writeFileSync(path.join(f.root, 'scripts/integration/native-pins.json'), 'new pins')
+  assert.notEqual(run().stdout, first.stdout)
+})
+test('Docker local policy cannot start an engine or pull an image', (t) => {
+  const f = fixture(t)
+  const base =
+    'source "$PACKAGE_ROOT/lib/kernel-docker.sh"; kernel_docker_image() { echo fixture; }; docker() { case "$*" in "compose version") return 0;; info) return STATUS;; *) echo unexpected >&2; return 1;; esac; }; kernel_prepare_docker'
+  const result = f.shell(base.replace('STATUS', '1'))
+  assert.match(result.stderr, /Start Docker/)
+  assert.doesNotMatch(result.stderr, /unexpected/)
+})

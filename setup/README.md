@@ -59,6 +59,7 @@ The **Publish setup archive** workflow on main tests and publishes
 prerelease. Never replace an existing tag or asset. Qualify the affected profiles,
 then promote the release and update consumer version/digest pairs together.
 
-New profiles must declare their requirements explicitly. Workspace composition
-should prepare shared tools once, install its dependency roots, then invoke artifact
-steps; it must preserve local changes when selecting subrepository revisions.
+Profiles implement preflight, artifact preparation and verification. Workspace additionally
+selects its checkouts and dependency roots, then calls product artifact functions; it never
+runs standalone installers over integrated links. Profile fingerprint/environment extensions
+retain provider inputs and non-secret selections. Git fixtures protect local work during refresh.
