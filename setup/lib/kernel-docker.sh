@@ -23,6 +23,7 @@ kernel_start_docker() {
   if ! docker info >/dev/null 2>&1; then
     [[ "$AGENT_SETUP_TOOLS" != check ]] || agent_die 'Start Docker on your machine, then rerun setup'
     [[ "$(id -u)" == 0 ]] || agent_die 'Docker daemon unavailable; start it with your system service manager'
+    kernel_clear_stale_pid /var/run/docker.pid
     mkdir -p "$AGENT_SETUP_HOME/logs"
     nohup dockerd > "$AGENT_SETUP_HOME/logs/kernel-docker.log" 2>&1 < /dev/null &
     for ((attempt=0; attempt<30; attempt++)); do
@@ -37,4 +38,15 @@ kernel_resume_docker() {
   docker compose version >/dev/null
   kernel_start_docker
   docker image inspect "$(kernel_docker_image)" >/dev/null || agent_die "Prepared FalkorDB image is missing; rerun explicit setup"
+}
+
+# A reboot can recycle the saved PID for an unrelated process. Never kill it.
+kernel_clear_stale_pid() {
+  local file="$1" pid command
+  [[ -f "$file" ]] || return 0
+  pid="$(cat "$file")"
+  command=""
+  if [[ "$pid" =~ ^[0-9]+$ ]]; then command="$(ps -p "$pid" -o comm= 2>/dev/null || true)"; fi
+  case "$command" in dockerd|*/dockerd) return 0 ;; esac
+  rm -f "$file"
 }

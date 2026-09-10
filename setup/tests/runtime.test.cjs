@@ -337,3 +337,22 @@ test('Docker resume restarts only its installed engine and never downloads', (t)
   assert.doesNotMatch(fs.readFileSync(path.join(f.root, 'docker-calls'), 'utf8'), /pull/)
   assert.equal(f.shell(body).status, 0)
 })
+
+test('Docker discards recycled PID files but preserves a live daemon PID', (t) => {
+  const f = fixture(t)
+  const bin = path.join(f.root, 'bin')
+  fs.mkdirSync(bin)
+  fs.writeFileSync(path.join(bin, 'ps'), '#!/bin/sh\ncat "$AGENT_REPO_ROOT/process-name"\n', {
+    mode: 0o755,
+  })
+  f.env.PATH = bin + path.delimiter + process.env.PATH
+  const pidfile = path.join(f.root, 'docker.pid')
+  const body =
+    'source "$PACKAGE_ROOT/lib/kernel-docker.sh"; kernel_clear_stale_pid "$AGENT_REPO_ROOT/docker.pid"'
+  for (const name of ['kworker/0:2', '', 'dockerd', '/usr/bin/dockerd']) {
+    fs.writeFileSync(pidfile, '1600\n')
+    fs.writeFileSync(path.join(f.root, 'process-name'), name + '\n')
+    assert.equal(f.shell(body).status, 0)
+    assert.equal(fs.existsSync(pidfile), name.endsWith('dockerd'))
+  }
+})
