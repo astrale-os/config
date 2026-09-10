@@ -77,3 +77,11 @@ The isolated Chrome DevTools readiness probe uses `--no-sandbox` for root cloud
 VMs and GitHub Actions runners, where downloaded Chromium cannot create its
 sandbox. The probe opens only `about:blank`; ordinary local users retain the
 browser sandbox. No machine security setting is changed.
+
+GUI readiness executes Electron with `--version`, without starting the application
+or requiring a display, and compares it with the installed package version. An
+executable file alone is not sufficient. During installation only, a diagnosed
+missing `libgtk-3.so.0` is repaired through the same bounded, signed APT path as
+Chromium. Read-only verification and local check mode never install that library.
+Application UI smoke tests still require a display (or Xvfb) and the product's
+own build/start commands; this readiness check does not replace them.
