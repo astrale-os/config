@@ -68,6 +68,8 @@ agent_install_browser_dependencies() (
   # Common: this is called ONLY after a real Chromium launch reports missing system libraries.
   # Healthy Claude Cloud browsers never enter here. Other launch failures must not trigger APT.
   local logs="$1" temporary real_apt source_mode=configured source_directory='' tool
+  shift
+  local packages=("$@")
   local elevate=()
   [[ "$(uname -s)" == Linux ]] || agent_die 'Automatic browser library repair requires Linux with APT'
   for tool in apt-get timeout dpkg; do
@@ -108,11 +110,15 @@ agent_install_browser_dependencies() (
   agent_log "Installing Chromium system libraries (apt=$source_mode; log: $logs/dependencies.log)"
   # Run Playwright itself as root so its child apt-get retains our bounded wrapper. Existing
   # APT_CONFIG and proxy settings are preserved; Playwright still owns the distro package list.
+  local installer=("$(command -v node)" "$(command -v playwright)" install-deps chromium)
+  if (( ${#packages[@]} )); then
+    installer=(bash -c 'apt-get update && apt-get install --no-install-recommends -y "$@"' setup-gui "${packages[@]}")
+  fi
   "${elevate[@]}" env PATH="$temporary/bin:$PATH" \
     AGENT_BROWSER_APT_GET="$real_apt" AGENT_BROWSER_APT_SOURCES="$source_directory" \
     AGENT_BROWSER_APT_UPDATE_TIMEOUT="${AGENT_BROWSER_APT_UPDATE_TIMEOUT:-90}" \
     DEBIAN_FRONTEND=noninteractive \
-    "$(command -v node)" "$(command -v playwright)" install-deps chromium 2>&1 | tee "$logs/dependencies.log"
+    "${installer[@]}" 2>&1 | tee "$logs/dependencies.log"
   printf '%s\n' "$source_mode" > "$logs/apt-source"
 )
 
