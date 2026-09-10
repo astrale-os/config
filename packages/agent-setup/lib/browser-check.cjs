@@ -70,8 +70,11 @@ async function main() {
     const args = ['--sessionId', randomUUID()]
     try {
       const launch = [...args, 'start', '--headless', '--isolated', '--executablePath', executable]
-      // Cloud VMs run as root; leave the browser sandbox enabled for ordinary local users.
-      if (process.getuid?.() === 0) launch.push('--chromeArg=--no-sandbox')
+      // GitHub Ubuntu runners deny the user namespaces required by downloaded Chrome.
+      // This isolated about:blank probe needs no sandbox there (or in root cloud VMs).
+      // Preserve the default sandbox for ordinary local users.
+      if (process.getuid?.() === 0 || process.env.GITHUB_ACTIONS === 'true')
+        launch.push('--chromeArg=--no-sandbox')
       command('chrome-devtools', launch)
       const pages = command('chrome-devtools', [...args, 'list_pages'])
       if (!pages.includes('about:blank'))

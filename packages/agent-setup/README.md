@@ -72,3 +72,8 @@ It never resolves latest. Keep GitHub and its release asset redirect host
 `release-assets.githubusercontent.com` accessible in cloud environments.
 A public asset was verified from Claude SDK without Config attached; the full
 automatic bootstrap remains a separate rollout gate.
+
+The isolated Chrome DevTools readiness probe uses `--no-sandbox` for root cloud
+VMs and GitHub Actions runners, where downloaded Chromium cannot create its
+sandbox. The probe opens only `about:blank`; ordinary local users retain the
+browser sandbox. No machine security setting is changed.
