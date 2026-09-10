@@ -23,5 +23,14 @@ agent_verify() {
       done
     done
   fi
+  if [[ "$AGENT_SETUP_ASTRALE_CLI" == 1 ]]; then
+    astrale --version
+    local harness skill
+    for harness in ${AGENT_HARNESSES//,/ }; do
+      for skill in astrale-cli astrale-domain; do
+        node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$(agent_skill_directory "$harness")/$skill" "$skill"
+      done
+    done
+  fi
   agent_log "Ready: $AGENT_SETUP_PROFILE"
 }

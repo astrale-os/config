@@ -6,13 +6,15 @@ PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$PACKAGE_DIR/lib/common.sh"
 agent_load_config
 agent_resolve_harnesses
-case "${AGENT_SETUP_PROFILE:-}" in config|sdk|gui|cli) ;; *) agent_die 'Unsupported setup profile';; esac
+case "${AGENT_SETUP_PROFILE:-}" in config|sdk|gui|cli|admin) ;; *) agent_die 'Unsupported setup profile';; esac
 source "$PACKAGE_DIR/profiles/$AGENT_SETUP_PROFILE.sh"
 source "$PACKAGE_DIR/lib/verify.sh"
+source "$PACKAGE_DIR/lib/astrale.sh"
 agent_prepare() {
   repo_preflight
   bash "$PACKAGE_DIR/setup_runtimes.sh"
   bash "$PACKAGE_DIR/setup_browser_tools.sh"
+  agent_prepare_astrale
   bash "$PACKAGE_DIR/setup_skills.sh"
   # Child preparation publishes activation links; this shell already has them on PATH.
   agent_install_repo

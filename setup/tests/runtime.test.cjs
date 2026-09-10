@@ -176,3 +176,49 @@ test('CLI verification never regenerates missing or stale assets', (t) => {
   assert.match(calls, /embeddedAssetCacheIsCurrent/)
   assert.doesNotMatch(calls, /bin\/astrale.ts|bin\/run.ts|assets:ensure/)
 })
+
+test('Astrale local policy rejects a missing CLI without installing it', (t) => {
+  const f = fixture(t)
+  const result = f.shell(
+    'source "$PACKAGE_ROOT/lib/astrale.sh"; AGENT_SETUP_ASTRALE_CLI=1; astrale() { return 1; }; node() { echo unexpected-install; }; agent_prepare_astrale',
+  )
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /Install the published Astrale CLI locally/)
+  assert.doesNotMatch(result.stdout, /unexpected-install/)
+})
+
+test('Astrale installation reuses a working executable without downloading', (t) => {
+  const f = fixture(t)
+  const bin = path.join(f.root, 'bin')
+  fs.mkdirSync(bin)
+  fs.writeFileSync(path.join(bin, 'astrale'), '#!/bin/sh\necho 1.0.0\n', { mode: 0o755 })
+  const result = f.shell(
+    'source "$PACKAGE_ROOT/lib/astrale.sh"; export PATH="$AGENT_REPO_ROOT/bin:$PATH"; AGENT_SETUP_ASTRALE_CLI=1; AGENT_SETUP_TOOLS=install; node() { echo unexpected-install; return 99; }; agent_prepare_astrale',
+  )
+  assert.equal(result.status, 0, result.stderr)
+  assert.doesNotMatch(result.stdout, /unexpected-install/)
+})
+
+test('Admin preflight checks all package manifests without executing package tools', (t) => {
+  const f = fixture(t)
+  fs.writeFileSync(path.join(f.root, 'pnpm-workspace.yaml'), 'packages: []')
+  for (const name of [
+    'auth',
+    'registry',
+    'router',
+    'console',
+    'console/web',
+    'invitation',
+    'test',
+    'test/web',
+    'domain',
+    'worker',
+  ]) {
+    fs.mkdirSync(path.join(f.root, name), { recursive: true })
+    fs.writeFileSync(path.join(f.root, name, 'package.json'), '{}')
+  }
+  const check = 'source "$PACKAGE_ROOT/profiles/admin.sh"; repo_preflight'
+  assert.equal(f.shell(check).status, 0)
+  fs.unlinkSync(path.join(f.root, 'test/web/package.json'))
+  assert.match(f.shell(check).stderr, /missing test\/web\/package.json/)
+})
