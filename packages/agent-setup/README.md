@@ -1,6 +1,6 @@
 # Astrale environment setup
 
-This package owns environment preparation. Consumers pin its exact published
+This directory owns environment preparation. Consumers pin its exact published
 archive version and SHA-256 in `scripts/setup/setup.lock`, retain the stable
 `bootstrap/setup.sh` launcher and declare their profile in `repo.sh`:
 
@@ -27,10 +27,10 @@ empty. The remote hook owns locking and input-based reuse, and writes a success
 marker only after all checks pass. Local hooks load prepared paths only.
 
 The bootstrap requires Bash, curl, tar/gzip and sha256sum or shasum, not Node/npm.
-It downloads from npm, validates the checked-in digest before extraction, and
+It downloads from a public Config GitHub release, validates the checked-in digest before extraction, and
 shares only the verified archive cache. It never follows latest or a Git branch.
 Archive fetch is separate from machine-tool installation; local `check` mode can
-fetch this pinned package while refusing installation of global runtimes/browsers.
+fetch this pinned archive while refusing installation of global runtimes/browsers.
 
 ## Ownership and composition
 
@@ -50,3 +50,25 @@ Before publishing: test the packed archive, bootstrap integrity/cache behavior,
 external repository paths, local check mode and automatic Claude reuse. Validate
 SDK and GUI on fresh Linux and real clouds before replacing legacy consumers.
 Expand profiles and remove the legacy synchronizer only after all consumers pass.
+
+## Distribution
+
+No new npm package is published. The private package manifest is only used by
+Config's workspace tests and records the archive version.
+
+Run `bash packages/agent-setup/pack.sh /tmp/setup-release` to produce
+`astrale-setup-VERSION.tar.gz` and its SHA256 file. The archive has a `package/`
+root and includes only the runtime, profiles, bootstrap, README and manifest.
+
+The **Publish setup archive** workflow must be dispatched on main after checks
+pass. It tests and packs the checked-out revision, then creates a prerelease
+`setup-vVERSION` with both files; it never replaces an existing tag or asset.
+Increment the private manifest version before the next release. Promote the
+prerelease only after SDK and GUI automatic cloud validation succeeds.
+
+Consumers commit `VERSION SHA256` in `setup.lock`; the bootstrap downloads
+`https://github.com/astrale-os/config/releases/download/setup-vVERSION/astrale-setup-VERSION.tar.gz`.
+It never resolves latest. Keep GitHub and its release asset redirect host
+`release-assets.githubusercontent.com` accessible in cloud environments.
+A public asset was verified from Claude SDK without Config attached; the full
+automatic bootstrap remains a separate rollout gate.

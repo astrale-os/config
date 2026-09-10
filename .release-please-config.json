@@ -9,19 +9,48 @@
       "extra-files": ["jsr.json"]
     },
     "packages/ox": {},
-    "packages/agent-setup": {},
     "packages/renovate": {}
   },
   "changelog-sections": [
-    { "type": "feat", "section": "Features" },
-    { "type": "fix", "section": "Bug Fixes" },
-    { "type": "perf", "section": "Performance Improvements" },
-    { "type": "docs", "section": "Documentation" },
-    { "type": "chore", "hidden": true },
-    { "type": "build", "hidden": true },
-    { "type": "ci", "hidden": true },
-    { "type": "test", "hidden": true },
-    { "type": "refactor", "hidden": true },
-    { "type": "style", "hidden": true }
+    {
+      "type": "feat",
+      "section": "Features"
+    },
+    {
+      "type": "fix",
+      "section": "Bug Fixes"
+    },
+    {
+      "type": "perf",
+      "section": "Performance Improvements"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation"
+    },
+    {
+      "type": "chore",
+      "hidden": true
+    },
+    {
+      "type": "build",
+      "hidden": true
+    },
+    {
+      "type": "ci",
+      "hidden": true
+    },
+    {
+      "type": "test",
+      "hidden": true
+    },
+    {
+      "type": "refactor",
+      "hidden": true
+    },
+    {
+      "type": "style",
+      "hidden": true
+    }
   ]
 }

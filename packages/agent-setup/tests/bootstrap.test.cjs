@@ -22,7 +22,7 @@ function fixture(t) {
   fs.writeFileSync(path.join(scripts, 'setup.lock'), `0.1.0 ${hash}\n`)
   fs.writeFileSync(
     path.join(bin, 'curl'),
-    '#!/bin/bash\necho download >> "$CALLS"\nwhile [[ "$1" != -o ]]; do shift; done\ncp "$SOURCE_ARCHIVE" "$2"\n',
+    '#!/bin/bash\nprintf "%s\\n" "$@" >> "$URL_ARGS"\necho download >> "$CALLS"\nwhile [[ "$1" != -o ]]; do shift; done\ncp "$SOURCE_ARCHIVE" "$2"\n',
     { mode: 0o755 },
   )
   const env = {
@@ -32,6 +32,7 @@ function fixture(t) {
     PATH: `${bin}:${process.env.PATH}`,
     SOURCE_ARCHIVE: archive,
     CALLS: path.join(root, 'calls'),
+    URL_ARGS: path.join(root, 'url-args'),
     RESULT: path.join(root, 'result'),
   }
   return {
@@ -53,6 +54,13 @@ test('bootstrap downloads once, uses explicit repo path and verifies cached byte
   const f = fixture(t)
   let result = f.run('prepare')
   assert.equal(result.status, 0, result.stderr)
+  assert.ok(
+    fs
+      .readFileSync(f.env.URL_ARGS, 'utf8')
+      .includes(
+        'https://github.com/astrale-os/config/releases/download/setup-v0.1.0/astrale-setup-0.1.0.tar.gz',
+      ),
+  )
   assert.equal(fs.readFileSync(f.env.RESULT, 'utf8'), `${f.repo}\nprepare\n`)
   result = f.run('verify')
   assert.equal(result.status, 0, result.stderr)

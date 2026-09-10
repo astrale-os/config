@@ -2,6 +2,5 @@
   "packages/typescript": "1.1.3",
   "packages/commitlint": "2.0.5",
   "packages/ox": "0.1.4",
-  "packages/agent-setup": "0.1.0",
   "packages/renovate": "1.2.0"
 }

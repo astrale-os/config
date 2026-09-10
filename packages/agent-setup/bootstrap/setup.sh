@@ -21,7 +21,7 @@ if ! valid; then
   download="$(mktemp "$cache/download.XXXXXX")"
   trap 'rm -f "$download"' EXIT
   curl --fail --location --silent --show-error --retry 2 --connect-timeout 20 --max-time 300 \
-    "https://registry.npmjs.org/@astrale-os/agent-setup/-/agent-setup-$version.tgz" -o "$download"
+    "https://github.com/astrale-os/config/releases/download/setup-v$version/astrale-setup-$version.tar.gz" -o "$download"
   [[ "$(sha "$download" | cut -d ' ' -f 1)" == "$digest" ]] || { echo 'Setup archive integrity mismatch' >&2; exit 1; }
   mv "$download" "$archive"
 fi

@@ -20,4 +20,4 @@ jobs:
         run: |
           find packages/agent-setup -name '*.sh' -exec bash -n {} \;
           node --test packages/agent-setup/tests/*.test.cjs
-          npm pack ./packages/agent-setup --ignore-scripts
+          bash packages/agent-setup/pack.sh "$RUNNER_TEMP/setup-release"

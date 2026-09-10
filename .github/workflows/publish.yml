@@ -8,7 +8,6 @@ on:
       - 'packages/*/src/**'
       - 'packages/typescript/*.json'
       - 'packages/ox/**'
-      - 'packages/agent-setup/**'
       - 'package.json'
       - 'pnpm-workspace.yaml'
       - '.github/actions/publish/jsr/**'
@@ -47,6 +46,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/publish/packages
         with:
-          dirs: 'packages/ox packages/agent-setup'
+          dirs: 'packages/ox'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           build-command: 'echo "ox ships prebuilt js — no build step"'
