@@ -244,18 +244,18 @@ agent_ensure_bun() {
     return
   fi
   if [[ "$AGENT_SETUP_TOOLS" == check ]]; then
-    bun --version >/dev/null 2>&1 || agent_die "Install Bun on your machine, then rerun setup"
+    [[ "$(bun --version 2>/dev/null || true)" == 1.4.2 ]] || agent_die "Activate Bun 1.4.2 locally"
     return
   fi
-  if bun --version >/dev/null 2>&1; then
+  if [[ "$(bun --version 2>/dev/null || true)" == 1.4.2 ]]; then
     agent_link "$(command -v bun)" bun
     agent_log "Reusing Bun $(bun --version)"
     return
   fi
-  agent_log "Installing the current Bun release"
-  agent_npm_install "$AGENT_SETUP_HOME/bun" bun@latest
+  agent_log "Installing Bun 1.4.2"
+  agent_npm_install "$AGENT_SETUP_HOME/bun" bun@1.4.2
   agent_link "$AGENT_SETUP_HOME/bun/bin/bun" bun
-  bun --version
+  [[ "$(bun --version)" == 1.4.2 ]] || agent_die 'Incorrect Bun after preparation'
 }
 
 agent_ensure_cli() {

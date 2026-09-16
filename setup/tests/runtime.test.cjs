@@ -60,7 +60,7 @@ test('fingerprint changes for manifests and pins but not ordinary source edits',
   const original = fingerprint()
   fs.writeFileSync(path.join(f.root, 'source.ts'), 'export const value = 1')
   assert.equal(fingerprint(), original)
-  fs.writeFileSync(path.join(f.root, '.bun-version'), '1.4.0\n')
+  fs.writeFileSync(path.join(f.root, '.bun-version'), '1.4.2\n')
   assert.notEqual(fingerprint(), original)
 })
 
@@ -99,7 +99,7 @@ test('Claude prepares once, refreshes changed inputs and never caches a failure'
   assert.equal(f.shell(body).status, 0)
   assert.equal(f.shell(body).status, 0)
   assert.equal(fs.readFileSync(path.join(f.root, 'calls'), 'utf8'), 'prepare\n')
-  fs.writeFileSync(path.join(f.root, '.bun-version'), '1.4.0\n')
+  fs.writeFileSync(path.join(f.root, '.bun-version'), '1.4.2\n')
   fs.writeFileSync(path.join(f.root, 'fail'), '')
   assert.notEqual(f.shell(body).status, 0)
   const state = path.join(f.env.AGENT_SETUP_HOME, 'state/claude')
@@ -144,12 +144,12 @@ test('CLI preflight rejects an invalid Bun pin or an incomplete checkout before 
     fs.mkdirSync(path.dirname(path.join(f.root, name)), { recursive: true })
     fs.writeFileSync(path.join(f.root, name), '{}')
   }
-  fs.writeFileSync(path.join(f.root, '.bun-version'), '1.4.0\n')
+  fs.writeFileSync(path.join(f.root, '.bun-version'), '1.4.2\n')
   const check = 'source "$PACKAGE_ROOT/profiles/cli.sh"; repo_preflight'
   assert.equal(f.shell(check).status, 0)
   fs.writeFileSync(path.join(f.root, '.bun-version'), 'latest\n')
   assert.match(f.shell(check).stderr, /exact Bun version/)
-  fs.writeFileSync(path.join(f.root, '.bun-version'), '1.4.0\n')
+  fs.writeFileSync(path.join(f.root, '.bun-version'), '1.4.2\n')
   fs.unlinkSync(path.join(f.root, 'studio/package.json'))
   assert.match(f.shell(check).stderr, /Incomplete CLI checkout/)
 })
