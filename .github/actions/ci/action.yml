@@ -60,13 +60,14 @@ runs:
     - name: Setup pnpm
       uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
 
-    - name: Setup Node.js (with registry, no cache)
+    - name: Setup Node.js (with registry)
       if: inputs.registry-url != ''
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
         node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version-file }}
         package-manager-cache: false
+        cache: ${{ inputs.registry-url == 'https://registry.npmjs.org' && inputs.token == '' && inputs.frozen-lockfile == 'true' && inputs.cache == 'true' && 'pnpm' || '' }}
         registry-url: ${{ inputs.registry-url }}
         scope: ${{ inputs.scope }}
 

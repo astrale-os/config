@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { runInNewContext } from 'node:vm'
 
 const actions = [
   '.github/actions/ci/action.yml',
@@ -33,7 +34,6 @@ test('shared install actions default to frozen lockfiles', async () => {
         /run: bash "\$\{\{ github\.action_path \}\}\/\.\.\/rebuild-dependencies\.sh"/,
       )
       assert.match(source, /INSTALL_FROZEN_LOCKFILE: \$\{\{ inputs\.frozen-lockfile \}\}/)
-      assert.doesNotMatch(source, /Setup Node\.js \(with registry \+ cache\)/)
       assert.match(
         source,
         /if: inputs\.registry-url == '' && inputs\.token == '' && inputs\.frozen-lockfile == 'true' && inputs\.cache == 'true'/,
@@ -87,6 +87,44 @@ test('shared install actions default to frozen lockfiles', async () => {
         : ciAction.length
     assert.ok(start >= 0 && end > start, `${name} must remain present`)
     assert.match(ciAction.slice(start, end), /run-token-free\.sh/)
+  }
+})
+
+test('public registry caching excludes authenticated, mutable, and opted-out installs', async () => {
+  const defaults = {
+    'registry-url': 'https://registry.npmjs.org',
+    token: '',
+    'frozen-lockfile': 'true',
+    cache: 'true',
+  }
+  const cases = [
+    ['public frozen install', {}, 'pnpm'],
+    ['authenticated install', { token: 'test-token' }, ''],
+    ['mutable lockfile', { 'frozen-lockfile': 'false' }, ''],
+    ['cache opt-out', { cache: 'false' }, ''],
+    ['private registry', { 'registry-url': 'https://npm.pkg.github.com' }, ''],
+    ['unrecognized registry', { 'registry-url': 'https://registry.npmjs.org.example.com' }, ''],
+  ]
+
+  for (const file of authenticatedActions) {
+    const source = await readFile(file, 'utf8')
+    const registryStep = source
+      .split('\n    - ')
+      .find((step) => step.includes("if: inputs.registry-url != ''"))
+    assert.ok(registryStep, `${file} must configure explicit registries`)
+    assert.match(registryStep, /package-manager-cache: false/)
+    const expression = registryStep.match(/\n        cache: \$\{\{ (.+) \}\}/)?.[1]
+    assert.ok(expression, `${file} must guard explicit registry caching`)
+
+    // Evaluate the guard with string inputs, including each opt-out boundary.
+    const javascript = expression.replaceAll(/inputs\.([a-z-]+)/g, "inputs['$1']")
+    for (const [name, overrides, expected] of cases) {
+      assert.equal(
+        runInNewContext(javascript, { inputs: { ...defaults, ...overrides } }),
+        expected,
+        `${file}: ${name}`,
+      )
+    }
   }
 })
 
