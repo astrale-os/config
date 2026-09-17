@@ -4,7 +4,15 @@
 setup = "AGENT_SETUP_TOOLS=check bash scripts/setup/setup.sh"
 run_mode = "concurrent"
 
-[scripts.run.agent-setup]
+# This repository OWNS the setup archive every other Astrale repository consumes, so
+# here verification is the product under test, not plumbing — the one place where a
+# setup button on one click earns its slot. Identical options to `setup`, as the
+# archive's own README requires.
+[scripts.run.setup]
 command = "AGENT_SETUP_TOOLS=check bash scripts/setup/verify.sh"
 default = true
+icon = "test-tube"
+
+[scripts.run.check]
+command = "pnpm test"
 icon = "test-tube"
