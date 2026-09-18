@@ -13,6 +13,7 @@ repo_prepare() {
   pnpm run assets:ensure
   # Root (Viewer) and Studio may resolve different Playwright browser revisions.
   if [[ "$AGENT_SETUP_BROWSER" == 1 && "$AGENT_SETUP_TOOLS" != check ]]; then
+    agent_select_browser
     pnpm exec playwright install chromium
     pnpm --dir studio exec playwright install chromium
   fi

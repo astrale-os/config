@@ -363,7 +363,8 @@ test('CLI browser preparation respects install, check, and disabled policies', (
     f.shell(`
     source "$PACKAGE_ROOT/profiles/cli.sh"
     AGENT_SETUP_BROWSER=${browser}; AGENT_SETUP_TOOLS=${policy}
-    pnpm() { printf '%s\\n' "$*"; }
+    agent_select_browser() { export PLAYWRIGHT_BROWSERS_PATH="$AGENT_REPO_ROOT/browsers"; }
+    pnpm() { [[ "$*" != *install* || "\${PLAYWRIGHT_BROWSERS_PATH:-}" == "$AGENT_REPO_ROOT/browsers" ]] || return 99; printf '%s\\n' "$*"; }
     repo_prepare
   `)
   const installed = run(1, 'install')
