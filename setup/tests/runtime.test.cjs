@@ -132,7 +132,7 @@ test('CLI preflight rejects an invalid Bun pin or an incomplete checkout before 
   const f = fixture(t)
   fs.writeFileSync(
     path.join(f.root, 'scripts/setup/repo.sh'),
-    'export AGENT_SETUP_PROFILE=cli AGENT_SETUP_BROWSER=0 AGENT_SETUP_ASTRALE_CLI=0\n',
+    'export AGENT_SETUP_PROFILE=cli AGENT_SETUP_BROWSER=1 AGENT_SETUP_ASTRALE_CLI=0\n',
   )
   for (const name of [
     'pnpm-workspace.yaml',
@@ -354,5 +354,64 @@ test('Docker discards recycled PID files but preserves a live daemon PID', (t) =
     fs.writeFileSync(path.join(f.root, 'process-name'), name + '\n')
     assert.equal(f.shell(body).status, 0)
     assert.equal(fs.existsSync(pidfile), name.endsWith('dockerd'))
+  }
+})
+
+test('CLI browser preparation respects install, check, and disabled policies', (t) => {
+  const f = fixture(t)
+  const run = (browser, policy) =>
+    f.shell(`
+    source "$PACKAGE_ROOT/profiles/cli.sh"
+    AGENT_SETUP_BROWSER=${browser}; AGENT_SETUP_TOOLS=${policy}
+    pnpm() { printf '%s\\n' "$*"; }
+    repo_prepare
+  `)
+  const installed = run(1, 'install')
+  assert.equal(installed.status, 0, installed.stderr)
+  assert.equal(
+    installed.stdout,
+    'run assets:ensure\nexec playwright install chromium\n--dir studio exec playwright install chromium\n',
+  )
+  for (const [browser, policy] of [
+    [1, 'check'],
+    [0, 'install'],
+  ]) {
+    const result = run(browser, policy)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stdout, 'run assets:ensure\n')
+  }
+})
+
+test('CLI readiness probes both project browsers and propagates launch failures without installation', (t) => {
+  const f = fixture(t)
+  for (const name of [
+    'src/generated/embedded-assets.ts',
+    'viewer/dist/index.html',
+    'studio/client/dist/index.html',
+  ]) {
+    fs.mkdirSync(path.dirname(path.join(f.root, name)), { recursive: true })
+    fs.writeFileSync(path.join(f.root, name), 'fixture')
+  }
+  fs.mkdirSync(path.join(f.root, 'studio/node_modules'), { recursive: true })
+  const run = (failedPackage) =>
+    f.shell(`
+    cd "$AGENT_REPO_ROOT"; source "$PACKAGE_ROOT/profiles/cli.sh"
+    AGENT_SETUP_BROWSER=1
+    bun() { :; }
+    pnpm() {
+      [[ \"$*\" != *install* ]] || return 99
+      if [[ "$*" == *'exec node'* ]]; then
+        printf '%s\\n' "$2"
+        [[ "$2" != '${failedPackage}' ]] || return 42
+      fi
+    }
+    repo_verify
+  `)
+  const healthy = run('none')
+  assert.equal(healthy.status, 0, healthy.stderr)
+  assert.equal(healthy.stdout, '.\nstudio\n')
+  for (const name of ['.', 'studio']) {
+    const result = run(name)
+    assert.equal(result.status, 42, result.stderr)
   }
 })
