@@ -6,3 +6,6 @@ coverage
 
 # Cloudflare Workers
 .dev.vars
+
+# Local Conductor settings
+.conductor/settings.local.toml
