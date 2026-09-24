@@ -91,6 +91,73 @@ test('initial checkout and repeated refresh follow remote main, never gitlink pi
     }
   }
 })
+test('a refused clone leaves a partial Workspace while every other child advances', (t) => {
+  const f = fixture(t)
+  git(f.root, 'submodule', 'deinit', '-f', '--all')
+  // Simulate a cloud session without access to one repository: its clone fails.
+  fs.rmSync(path.join(f.root, '.git', 'modules', 'datastore'), { recursive: true, force: true })
+  git(
+    f.root,
+    'config',
+    '--file',
+    '.gitmodules',
+    'submodule.datastore.url',
+    path.join(f.root, 'missing'),
+  )
+  const r = setup(f.root)
+  assert.equal(r.status, 0, r.stderr)
+  for (const repo of repos.filter((repo) => repo !== 'datastore'))
+    assert.equal(git(path.join(f.root, repo), 'rev-parse', 'HEAD'), f.latest)
+  assert.equal(fs.existsSync(path.join(f.root, 'datastore', '.git')), false)
+  const missing = run(
+    f.root,
+    'bash',
+    [
+      '-c',
+      'agent_die() { exit 1; }; source "$1"; workspace_missing_paths; workspace_partial && echo partial',
+      'test',
+      library,
+    ],
+    { AGENT_REPO_ROOT: f.root },
+  )
+  assert.equal(missing.status, 0, missing.stderr)
+  assert.equal(missing.stdout.trim(), 'datastore\npartial')
+})
+test('a complete Workspace is not partial', (t) => {
+  const f = fixture(t)
+  const r = run(
+    f.root,
+    'bash',
+    [
+      '-c',
+      'agent_die() { exit 1; }; source "$1"; workspace_partial && echo partial || echo complete',
+      'test',
+      library,
+    ],
+    { AGENT_REPO_ROOT: f.root },
+  )
+  assert.equal(r.stdout.trim(), 'complete')
+})
+test('the SessionStart hook output is one valid JSON object', () => {
+  const claude = path.join(__dirname, '../lib/claude.sh')
+  const output = (fresh, context) =>
+    run(os.tmpdir(), 'bash', [
+      '-c',
+      'source "$1"; agent_claude_output "$2" "$3"',
+      'test',
+      claude,
+      fresh,
+      context,
+    ]).stdout
+  assert.equal(output('', ''), '')
+  assert.deepEqual(JSON.parse(output('fresh', '')), {
+    hookSpecificOutput: { hookEventName: 'SessionStart', reloadSkills: true },
+  })
+  const context = 'missing "kernel" \\ run `setup`'
+  assert.deepEqual(JSON.parse(output('', context)), {
+    hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context },
+  })
+})
 test('dirty or untracked child work blocks before any checkout advances', (t) => {
   const f = fixture(t)
   const file = path.join(f.root, 'ui', 'untracked-work')
