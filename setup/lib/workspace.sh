@@ -30,6 +30,17 @@ workspace_preflight() {
   done <<< "$paths"
 }
 
+# Submodules without a checkout: never initialized, or their clone was refused.
+workspace_missing_paths() {
+  local path
+  for path in $(workspace_paths); do
+    [[ -e "$AGENT_REPO_ROOT/$path/.git" ]] || printf '%s\n' "$path"
+  done
+}
+
+# A partial Workspace prepares tools but no product dependencies or artifacts.
+workspace_partial() { [[ -n "$(workspace_missing_paths)" ]]; }
+
 workspace_update_main() {
   workspace_preflight
   local path directory target current paths
@@ -41,7 +52,13 @@ workspace_update_main() {
     directory="$AGENT_REPO_ROOT/$path"
     if [[ ! -e "$directory/.git" ]]; then
       # --remote selects origin/main, explicitly NOT the recorded workspace gitlink.
-      git -C "$AGENT_REPO_ROOT" -c "submodule.$path.branch=main" submodule update --init --remote -- "$path"
+      # A refused clone (e.g. a cloud session without access to that repository)
+      # leaves the path uninitialized; the Workspace then prepares as partial.
+      if ! GIT_TERMINAL_PROMPT=0 git -C "$AGENT_REPO_ROOT" -c "submodule.$path.branch=main" \
+        submodule update --init --remote -- "$path"; then
+        agent_log "WARNING: $path could not be cloned; continuing without it"
+        continue
+      fi
     fi
     git -C "$directory" fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
     target="$(git -C "$directory" rev-parse refs/remotes/origin/main)"
@@ -56,6 +73,7 @@ workspace_update_main() {
   done <<< "$paths"
   while read -r path; do
     directory="$AGENT_REPO_ROOT/$path"
+    [[ -e "$directory/.git" ]] || continue
     if git -C "$directory" show-ref --verify --quiet refs/heads/main; then
       git -C "$directory" switch main
       git -C "$directory" merge --ff-only refs/remotes/origin/main
@@ -69,6 +87,7 @@ workspace_update_main() {
 workspace_check_manifests() {
   local path
   for path in $(workspace_paths); do
+    [[ -e "$AGENT_REPO_ROOT/$path/.git" ]] || continue
     [[ -f "$AGENT_REPO_ROOT/$path/package.json" ]] || agent_die "Missing $path/package.json"
     [[ "$(tr -d '[:space:]' < "$AGENT_REPO_ROOT/$path/.nvmrc")" == "$(agent_node_version)" ]] ||
       agent_die "$path needs a different Node version; review shared Workspace runtime"

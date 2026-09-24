@@ -64,3 +64,6 @@ Profiles implement preflight, artifact preparation and verification. Workspace a
 selects its checkouts and dependency roots, then calls product artifact functions; it never
 runs standalone installers over integrated links. Profile fingerprint/environment extensions
 retain provider inputs and non-secret selections. Git fixtures protect local work during refresh.
+A Workspace submodule whose clone is refused (a cloud session without access to that
+repository) leaves the Workspace partial: tools are prepared, product dependencies and
+artifacts are skipped, and the Claude hook names the missing submodules to attach.

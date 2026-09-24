@@ -8,13 +8,18 @@ agent_verify() {
   if [[ -f .bun-version ]]; then
     [[ "$(bun --version)" == "$(tr -d '[:space:]' < .bun-version)" ]] || agent_die 'Incorrect Bun version'
   fi
-  [[ -f node_modules/.modules.yaml ]] || agent_die 'Repository dependencies are missing'
-  pnpm exec oxlint --version
-  pnpm exec oxfmt --version
+  # A partial repository (see repo_partial) prepares tools only, never dependencies.
+  local partial=false
+  if declare -F repo_partial >/dev/null && repo_partial; then partial=true; fi
+  if [[ "$partial" == false ]]; then
+    [[ -f node_modules/.modules.yaml ]] || agent_die 'Repository dependencies are missing'
+    pnpm exec oxlint --version
+    pnpm exec oxfmt --version
+  fi
   if [[ "$AGENT_SETUP_BROWSER" == 1 ]]; then agent_select_browser; fi
   repo_verify
   # Some products own their Ox configuration instead of depending on Config's exports.
-  node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('package.json','utf8')); if(p.dependencies?.['@astrale-os/ox'] || p.devDependencies?.['@astrale-os/ox']) { await import('@astrale-os/ox/fmt'); await import('@astrale-os/ox/lint'); }"
+  [[ "$partial" == true ]] || node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('package.json','utf8')); if(p.dependencies?.['@astrale-os/ox'] || p.devDependencies?.['@astrale-os/ox']) { await import('@astrale-os/ox/fmt'); await import('@astrale-os/ox/lint'); }"
   if [[ "$AGENT_SETUP_BROWSER" == 1 ]]; then
     local tool harness skill
     for tool in playwright agent-browser chrome-devtools; do agent_check_browser "$tool"; done
@@ -33,5 +38,5 @@ agent_verify() {
       done
     done
   fi
-  agent_log "Ready: $AGENT_SETUP_PROFILE"
+  if [[ "$partial" == true ]]; then agent_log "Ready (partial): $AGENT_SETUP_PROFILE"; else agent_log "Ready: $AGENT_SETUP_PROFILE"; fi
 }

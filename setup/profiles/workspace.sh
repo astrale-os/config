@@ -10,13 +10,25 @@ repo_checkout() {
   local repo version
   version="$(tr -d '[:space:]' < "$AGENT_REPO_ROOT/.bun-version")"
   for repo in cli kernel prototype; do
+    [[ -e "$AGENT_REPO_ROOT/$repo/.git" ]] || continue
     [[ "$(tr -d '[:space:]' < "$AGENT_REPO_ROOT/$repo/.bun-version")" == "$version" ]] || agent_die "$repo Bun pin differs from Workspace; review the shared runtime"
   done
+  if workspace_partial; then
+    agent_log "WARNING: partial Workspace, missing: $(workspace_missing_paths | tr '\n' ' ')"
+    agent_log 'Tools are prepared; product dependencies and artifacts are skipped until every submodule is present'
+  fi
+}
+repo_partial() { workspace_partial; }
+repo_session_context() {
+  workspace_partial || return 0
+  printf 'Astrale setup prepared a partial Workspace: the submodules %s could not be cloned, so product dependencies and builds were skipped. When a task needs one of them, attach it to the session (add_repo astrale-os/<name>), then rerun `bash scripts/setup/setup.sh`.' \
+    "$(workspace_missing_paths | paste -sd ',' - | sed 's/,/, /g')"
 }
 repo_dependencies() {
   local root="$AGENT_REPO_ROOT" repo version prefix
   # Publish the root pnpm link for lifecycle scripts and subsequent sessions.
   agent_ensure_pnpm
+  if workspace_partial; then return 0; fi
   # Warm exact product pnpm versions without replacing the Workspace activation link.
   for repo in . admin cli config datastore domains gui kernel prototype sdk shell ui ui/domain; do
     version="$(AGENT_REPO_ROOT="$root/$repo" agent_pnpm_version)"
@@ -44,6 +56,7 @@ workspace_profile() (
   "repo_$operation"
 )
 repo_prepare() {
+  if workspace_partial; then return 0; fi
   # Source-only products need no artifact step. Admin supplies local SSH tooling.
   workspace_profile admin prepare
   workspace_profile ui prepare
@@ -56,6 +69,7 @@ repo_prepare() {
 }
 repo_verify() {
   workspace_check_manifests
+  if workspace_partial; then return 0; fi
   local repo
   for repo in . domains gui; do
     [[ -f "$repo/node_modules/.modules.yaml" ]] || agent_die "Missing dependency root: $repo"
