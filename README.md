@@ -232,39 +232,60 @@ jobs:
 | `config-file`   | `.release-please-config.json`   | Path to config file                 |
 | `manifest-file` | `.release-please-manifest.json` | Path to manifest file               |
 | `target-branch` | repository default branch       | Branch Release Please should target |
-| `rewrite-pr-body` | none | Checked-out ES module that rewrites each generated PR body |
+| `renderer` | none | Checked-out ES module that generates PR Markdown from structured release data |
 
 **Outputs:** `releases_created`, `paths_released`, `prs_created`, `pr`, `prs`
 
-The PR outputs retain the Release Please metadata, with the rewritten `body` when a hook is used, so callers using the repository
-`GITHUB_TOKEN` can explicitly qualify the generated PR revision. GitHub suppresses workflow events
-created by that token, so relying on the PR's normal `pull_request` event is insufficient.
+The PR outputs retain Release Please's metadata so callers using the repository `GITHUB_TOKEN`
+can explicitly qualify the generated PR revision. GitHub suppresses workflow events created by
+that token, so relying on the PR's normal `pull_request` event is insufficient.
 
-#### Custom PR presentation
+#### Custom release presentation
 
-Set `rewrite-pr-body: .github/release/rewrite.mjs` to control the generated Markdown. The path is
-relative to the checked-out repository, and the module runs in the workflow's Node.js environment.
-Its default export receives the latest body, the GitHub REST pull request object, and the repository
-name (`owner/repo`), and returns a string or a promise of a string:
+Set `renderer: .github/release/render.mjs` to generate the PR body before it is created or updated.
+The module's default export receives `{ releases, repository, targetBranch, host, date }` and
+returns Markdown, synchronously or asynchronously. It receives data, rather than an existing PR
+body, and runs once for each candidate PR after all version and workspace dependency calculations.
 
 ```js
-export default function rewrite({ body, pullRequest, repository }) {
-  return body.replace(
-    ':robot: I have created a release *beep* *boop*',
-    `Release preview for ${repository} (#${pullRequest.number})`,
-  )
+export default function render({ releases }) {
+  const packages = releases.map(({ component, version, commits }) => {
+    const summary = component ? `${component}: ${version}` : version
+    const changes = commits.map(({ bareMessage }) => `* ${bareMessage}`).join('\n')
+    return `<details><summary>${summary}</summary>\n\n## ${version}\n\n${changes}\n</details>`
+  })
+  return ['Release preview', '---', ...packages, '---', 'Generated release'].join('\n\n')
 }
 ```
 
-The hook runs for every PR created or updated by Release Please. Keep it idempotent: returning the
-same body skips the API write, and subsequent invocations may receive an already rewritten body.
-The action owns GitHub reads, writes, and the `pr`/`prs` outputs; the module owns presentation.
-Without this input, the action behaves as before. A failed import, render, or API request fails the
-step; rendering all PRs completes before the first write.
+Each release includes:
 
-Release Please also reads this Markdown when publishing. Preserve its `---` delimiters and
-package/version markers (`<details><summary>component: version</summary>` for component releases,
-or the version heading for a single release). Rewrite the content within that structure freely.
-The rewritten notes also become GitHub release notes when Release Please publishes; the hook
-does not edit repository changelog files. Load the module from the trusted target-branch checkout,
-as with other release workflow code; no dependency installation is performed by this hook.
+- `path`, `component`, `name` (for Node packages), and `version`;
+- `previousVersion`, `previousTag`, and `currentTag` for comparisons;
+- `commits`: the parsed Conventional Commits passed to the release strategy, including `type`,
+  `scope`, `bareMessage`, `sha`, breaking-change notes, references, and PR metadata;
+- `changelogSections`: the configured section names and visibility;
+- `dependencies`: `{ type, name, from, to }` changes derived from the actual package updates and
+  released workspace versions. All dependency kinds are supplied; the renderer chooses which to
+  show. Unchanged peer ranges and external dependencies are omitted.
+
+`repository` is `owner/repo`, `host` is the GitHub server URL, and `date` is the UTC date in
+`YYYY-MM-DD` format. The module path is relative to the trusted target-branch checkout; loading it
+requires no consumer dependency installation.
+
+Release Please reads the generated body again when publishing. Emit its `---` delimiters and
+package/version markers (`<details><summary>component: version</summary>`, or a version heading for
+a componentless release). The adapter uses Release Please's own parser to verify the complete
+component/version inventory and serialize the native envelope before any PR write. This keeps
+subsequent unchanged invocations comparable. Place custom Markdown inside the header, footer, or
+each release's notes; the adapter retains the native body structure. Rendering all candidate PRs must succeed first;
+a failed import, render, or identity check leaves their bodies untouched. The normal Release Please
+comparison skips unchanged PRs without a separate read/patch cycle.
+
+With a renderer, the action runs the pinned Release Please **17.6.0** library (matching the default
+action) through its own Node.js runner. It installs only the action's private runtime with `npm ci`
+from the checked-in lockfile, with lifecycle scripts disabled; repository dependencies are not
+installed. Release creation, versioning, manifest/changelog updates, and PR writes stay owned by
+Release Please. The renderer controls the PR Markdown and the subsequent GitHub release notes;
+repository changelogs retain the configured native generator. Without `renderer`, the existing
+upstream action is used unchanged.

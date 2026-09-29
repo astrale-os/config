@@ -24,6 +24,8 @@ async function yamlFiles(directory) {
   const files = []
 
   for (const entry of entries) {
+    // Audit repository actions, not workflows shipped inside installed runtime dependencies.
+    if (entry.name === 'node_modules') continue
     const file = path.join(directory, entry.name)
     if (entry.isDirectory()) files.push(...(await yamlFiles(file)))
     else if (/\.ya?ml$/.test(entry.name)) files.push(file)
@@ -116,6 +118,7 @@ async function referenceFiles(directory) {
   const files = []
 
   for (const entry of entries) {
+    if (entry.name === 'node_modules') continue
     const file = path.join(directory, entry.name)
     if (entry.isDirectory()) files.push(...(await referenceFiles(file)))
     else if (/\.(?:md|ya?ml|[cm]?js|ts|json)$/.test(entry.name)) files.push(file)

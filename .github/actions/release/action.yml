@@ -14,55 +14,68 @@ inputs:
   target-branch:
     description: Branch Release Please should target
     required: false
-  rewrite-pr-body:
-    description: Optional checked-out ES module exporting an async or sync body rewriter
+  renderer:
+    description: Optional checked-out ES module rendering structured releases before PR creation
     required: false
 
 outputs:
   releases_created:
     description: Whether any releases were created
-    value: ${{ steps.release.outputs.releases_created }}
+    value: ${{ steps.render.outputs.releases_created || steps.release.outputs.releases_created }}
   release_sha:
     description: Exact revision shared by every release created in this invocation
     value: ${{ steps.release-revision.outputs.sha }}
   paths_released:
     description: JSON array of paths that were released
-    value: ${{ steps.release.outputs.paths_released }}
+    value: ${{ steps.render.outputs.paths_released || steps.release.outputs.paths_released }}
   prs_created:
     description: Whether a release pull request was created or updated
-    value: ${{ steps.release.outputs.prs_created }}
+    value: ${{ steps.render.outputs.prs_created || steps.release.outputs.prs_created }}
   pr:
     description: JSON Release Please pull request object
-    value: ${{ steps.rewrite.outputs.pr || steps.release.outputs.pr }}
+    value: ${{ steps.render.outputs.pr || steps.release.outputs.pr }}
   prs:
     description: JSON array of Release Please pull request objects
-    value: ${{ steps.rewrite.outputs.prs || steps.release.outputs.prs }}
+    value: ${{ steps.render.outputs.prs || steps.release.outputs.prs }}
 
 runs:
   using: composite
   steps:
     - name: Release Please
       id: release
+      if: inputs.renderer == ''
       uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
       with:
         token: ${{ inputs.token }}
         config-file: ${{ inputs.config-file }}
         manifest-file: ${{ inputs.manifest-file }}
         target-branch: ${{ inputs.target-branch || github.event.repository.default_branch }}
+    - name: Setup renderer runtime
+      if: inputs.renderer != ''
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      with:
+        node-version: '26.7.0'
+        package-manager-cache: false
+    - name: Install the locked release runtime
+      if: inputs.renderer != ''
+      shell: bash
+      run: npm ci --prefix "${{ github.action_path }}" --ignore-scripts --no-audit --no-fund
+    - name: Generate releases and render PRs
+      id: render
+      if: inputs.renderer != ''
+      shell: bash
+      env:
+        RELEASE_TOKEN: ${{ inputs.token }}
+        RELEASE_RENDERER: ${{ inputs.renderer }}
+        RELEASE_TARGET_BRANCH: ${{ inputs.target-branch || github.event.repository.default_branch }}
+        RELEASE_CONFIG_FILE: ${{ inputs.config-file }}
+        RELEASE_MANIFEST_FILE: ${{ inputs.manifest-file }}
+      run: node "${{ github.action_path }}/run.mjs"
     - name: Resolve exact released revision
       id: release-revision
-      if: steps.release.outputs.releases_created == 'true'
+      if: steps.release.outputs.releases_created == 'true' || steps.render.outputs.releases_created == 'true'
       shell: bash
       env:
-        RELEASE_OUTPUTS: ${{ toJSON(steps.release.outputs) }}
-        PATHS_RELEASED: ${{ steps.release.outputs.paths_released }}
+        RELEASE_OUTPUTS: ${{ toJSON(steps.render.outputs.releases_created != '' && steps.render.outputs || steps.release.outputs) }}
+        PATHS_RELEASED: ${{ steps.render.outputs.paths_released || steps.release.outputs.paths_released }}
       run: node "${{ github.action_path }}/resolve-release-sha.mjs"
-    - name: Rewrite release PR bodies
-      id: rewrite
-      if: inputs.rewrite-pr-body != '' && steps.release.outputs.prs_created == 'true'
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.token }}
-        RELEASE_PRS: ${{ steps.release.outputs.prs }}
-        REWRITE_PR_BODY: ${{ inputs.rewrite-pr-body }}
-      run: node "${{ github.action_path }}/rewrite-pr-body.mjs"

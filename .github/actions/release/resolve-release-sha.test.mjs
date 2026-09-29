@@ -134,8 +134,14 @@ test('the composite action exposes only the resolver output as release_sha', asy
 
   assert.match(output ?? '', /value: \$\{\{ steps\.release-revision\.outputs\.sha \}\}/u)
   assert.match(step, /if: steps\.release\.outputs\.releases_created == 'true'/u)
-  assert.match(step, /RELEASE_OUTPUTS: \$\{\{ toJSON\(steps\.release\.outputs\) \}\}/u)
-  assert.match(step, /PATHS_RELEASED: \$\{\{ steps\.release\.outputs\.paths_released \}\}/u)
+  assert.match(
+    step,
+    /RELEASE_OUTPUTS: \$\{\{ toJSON\(steps\.render\.outputs\.releases_created != '' && steps\.render\.outputs \|\| steps\.release\.outputs\) \}\}/u,
+  )
+  assert.match(
+    step,
+    /PATHS_RELEASED: \$\{\{ steps\.render\.outputs\.paths_released \|\| steps\.release\.outputs\.paths_released \}\}/u,
+  )
   assert.match(step, /run: node "\$\{\{ github\.action_path \}\}\/resolve-release-sha\.mjs"/u)
   assert.doesNotMatch(`${output ?? ''}\n${step}`, /github\.sha/u)
 })
