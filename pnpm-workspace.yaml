@@ -1,6 +1,7 @@
 packages:
   - 'packages/*'
   - 'setup'
+  - '.github/actions/release'
 
 # Local integration uses the checked-out @astrale-os/ox package. Registry-only
 # qualification belongs to consuming repositories, not this source workspace.

@@ -1,0 +1,8 @@
+{
+  "name": "astrale-release-runner",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "release-please": "17.6.0"
+  }
+}
