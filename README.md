@@ -232,9 +232,39 @@ jobs:
 | `config-file`   | `.release-please-config.json`   | Path to config file                 |
 | `manifest-file` | `.release-please-manifest.json` | Path to manifest file               |
 | `target-branch` | repository default branch       | Branch Release Please should target |
+| `rewrite-pr-body` | none | Checked-out ES module that rewrites each generated PR body |
 
 **Outputs:** `releases_created`, `paths_released`, `prs_created`, `pr`, `prs`
 
-The PR outputs are forwarded unchanged from Release Please so callers using the repository
+The PR outputs retain the Release Please metadata, with the rewritten `body` when a hook is used, so callers using the repository
 `GITHUB_TOKEN` can explicitly qualify the generated PR revision. GitHub suppresses workflow events
 created by that token, so relying on the PR's normal `pull_request` event is insufficient.
+
+#### Custom PR presentation
+
+Set `rewrite-pr-body: .github/release/rewrite.mjs` to control the generated Markdown. The path is
+relative to the checked-out repository, and the module runs in the workflow's Node.js environment.
+Its default export receives the latest body, the GitHub REST pull request object, and the repository
+name (`owner/repo`), and returns a string or a promise of a string:
+
+```js
+export default function rewrite({ body, pullRequest, repository }) {
+  return body.replace(
+    ':robot: I have created a release *beep* *boop*',
+    `Release preview for ${repository} (#${pullRequest.number})`,
+  )
+}
+```
+
+The hook runs for every PR created or updated by Release Please. Keep it idempotent: returning the
+same body skips the API write, and subsequent invocations may receive an already rewritten body.
+The action owns GitHub reads, writes, and the `pr`/`prs` outputs; the module owns presentation.
+Without this input, the action behaves as before. A failed import, render, or API request fails the
+step; rendering all PRs completes before the first write.
+
+Release Please also reads this Markdown when publishing. Preserve its `---` delimiters and
+package/version markers (`<details><summary>component: version</summary>` for component releases,
+or the version heading for a single release). Rewrite the content within that structure freely.
+The rewritten notes also become GitHub release notes when Release Please publishes; the hook
+does not edit repository changelog files. Load the module from the trusted target-branch checkout,
+as with other release workflow code; no dependency installation is performed by this hook.

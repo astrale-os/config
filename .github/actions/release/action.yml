@@ -14,6 +14,9 @@ inputs:
   target-branch:
     description: Branch Release Please should target
     required: false
+  rewrite-pr-body:
+    description: Optional checked-out ES module exporting an async or sync body rewriter
+    required: false
 
 outputs:
   releases_created:
@@ -30,10 +33,10 @@ outputs:
     value: ${{ steps.release.outputs.prs_created }}
   pr:
     description: JSON Release Please pull request object
-    value: ${{ steps.release.outputs.pr }}
+    value: ${{ steps.rewrite.outputs.pr || steps.release.outputs.pr }}
   prs:
     description: JSON array of Release Please pull request objects
-    value: ${{ steps.release.outputs.prs }}
+    value: ${{ steps.rewrite.outputs.prs || steps.release.outputs.prs }}
 
 runs:
   using: composite
@@ -54,3 +57,12 @@ runs:
         RELEASE_OUTPUTS: ${{ toJSON(steps.release.outputs) }}
         PATHS_RELEASED: ${{ steps.release.outputs.paths_released }}
       run: node "${{ github.action_path }}/resolve-release-sha.mjs"
+    - name: Rewrite release PR bodies
+      id: rewrite
+      if: inputs.rewrite-pr-body != '' && steps.release.outputs.prs_created == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        RELEASE_PRS: ${{ steps.release.outputs.prs }}
+        REWRITE_PR_BODY: ${{ inputs.rewrite-pr-body }}
+      run: node "${{ github.action_path }}/rewrite-pr-body.mjs"
