@@ -289,3 +289,6 @@ installed. Release creation, versioning, manifest/changelog updates, and PR writ
 Release Please. The renderer controls the PR Markdown and the subsequent GitHub release notes;
 repository changelogs retain the configured native generator. Without `renderer`, the existing
 upstream action is used unchanged.
+
+Within Config, the private runner is a workspace package so the normal installation prepares its
+dependencies before the offline test phase. Tests do not perform a second dependency fetch.
