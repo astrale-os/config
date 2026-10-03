@@ -28,6 +28,8 @@ test('release archive contains runnable entrypoints and its digest matches the d
     'profiles/cli.sh',
     'profiles/sdk.sh',
     'profiles/gui.sh',
+    'profiles/kernel.sh',
+    'profiles/workspace.sh',
     'lib/common.sh',
     'lib/claude.sh',
   ]) {
