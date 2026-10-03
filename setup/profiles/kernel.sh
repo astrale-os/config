@@ -51,21 +51,19 @@ kernel_workbench_owned() {
 }
 
 repo_check_checkout() {
-  local file package packages
+  local package packages
   packages="$(kernel_workspace_packages)" || agent_die 'Cannot determine Kernel workspace ownership'
+  while IFS= read -r package; do
+    [[ -f "$AGENT_REPO_ROOT/$package/package.json" ]] || agent_die "Incomplete Kernel checkout: missing $package/package.json"
+  done <<< "$packages"
   for package in core dsl protocol ports runtime server host client backend __e2e__; do
     case $'\n'"$packages"$'\n' in
       *$'\n'"$package"$'\n'*) ;;
       *) agent_die "Incomplete Kernel workspace: missing package declaration $package" ;;
     esac
   done
-  for file in pnpm-workspace.yaml core/package.json dsl/package.json protocol/package.json ports/package.json runtime/package.json server/package.json host/package.json client/package.json backend/package.json __e2e__/package.json; do
-    [[ -f "$AGENT_REPO_ROOT/$file" ]] || agent_die "Incomplete Kernel checkout: missing $file"
-  done
   if kernel_workbench_owned; then
-    for file in test/package.json test/src/web/package.json test/cli/build.mjs; do
-      [[ -f "$AGENT_REPO_ROOT/$file" ]] || agent_die "Incomplete Kernel checkout: missing $file"
-    done
+    [[ -f "$AGENT_REPO_ROOT/test/cli/build.mjs" ]] || agent_die 'Incomplete Kernel checkout: missing test/cli/build.mjs'
   fi
   kernel_bun_version >/dev/null
 }

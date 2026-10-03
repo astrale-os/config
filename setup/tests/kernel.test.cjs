@@ -336,3 +336,18 @@ test('integrated verification rechecks declared Kernel ownership and manifests w
     assert.ok(fs.existsSync(path.join(f.root, 'core/node_modules')))
   }
 })
+
+test('every declared additional owner requires its manifest before runtime preparation', (t) => {
+  for (const owner of ['__e2e__/client-runtime', 'norm', 'another-owner']) {
+    const f = fixture(t)
+    f.workspace([...sourcePackages, owner])
+    f.write(owner + '/package.json', JSON.stringify({ name: owner }))
+    const complete = f.shell(noRuntimes + 'repo_preflight')
+    assert.equal(complete.status, 0, complete.stderr)
+    fs.unlinkSync(path.join(f.root, owner, 'package.json'))
+    const incomplete = f.shell(noRuntimes + 'repo_preflight')
+    assert.notEqual(incomplete.status, 0)
+    assert.ok(incomplete.stderr.includes('missing ' + owner + '/package.json'), incomplete.stderr)
+    assert.doesNotMatch(incomplete.stderr, /unexpected-/)
+  }
+})
