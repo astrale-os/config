@@ -13,6 +13,7 @@ repo_checkout() {
     [[ -e "$AGENT_REPO_ROOT/$repo/.git" ]] || continue
     [[ "$(tr -d '[:space:]' < "$AGENT_REPO_ROOT/$repo/.bun-version")" == "$version" ]] || agent_die "$repo Bun pin differs from Workspace; review the shared runtime"
   done
+  if ! workspace_partial; then workspace_profile kernel check_checkout; fi
   if workspace_partial; then
     agent_log "WARNING: partial Workspace, missing: $(workspace_missing_paths | tr '\n' ' ')"
     agent_log 'Tools are prepared; product dependencies and artifacts are skipped until every submodule is present'
@@ -61,7 +62,7 @@ repo_prepare() {
   workspace_profile admin prepare
   workspace_profile ui prepare
   workspace_profile gui prepare
-  workspace_pnpm "$AGENT_REPO_ROOT/kernel" --filter @astrale-os/kernel-test run build:cli
+  workspace_profile kernel prepare_workbench
   workspace_profile kernel prepare
   workspace_profile cli prepare
   workspace_pnpm "$AGENT_REPO_ROOT/cli" run build
