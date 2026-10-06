@@ -1,4 +1,4 @@
-# Explicit composition: shared tools once, three dependency roots, then product artifacts.
+# Explicit composition: shared tools once, four dependency roots, then product artifacts.
 source "$PACKAGE_DIR/lib/workspace.sh"
 repo_preflight() {
   agent_check_repo
@@ -21,6 +21,11 @@ repo_checkout() {
 }
 repo_partial() { workspace_partial; }
 repo_session_context() {
+  local unreviewed
+  unreviewed="$(workspace_unreviewed_paths | paste -sd ',' - | sed 's/,/, /g')"
+  if [[ -n "$unreviewed" ]]; then
+    printf 'Astrale setup ignored the submodules %s: this setup version does not prepare them yet (update the setup archive in astrale-os/config). ' "$unreviewed"
+  fi
   workspace_partial || return 0
   printf 'Astrale setup prepared a partial Workspace: the submodules %s could not be cloned, so product dependencies and builds were skipped. When a task needs one of them, attach it to the session (add_repo astrale-os/<name>), then rerun `bash scripts/setup/setup.sh`.' \
     "$(workspace_missing_paths | paste -sd ',' - | sed 's/,/, /g')"
@@ -31,7 +36,7 @@ repo_dependencies() {
   agent_ensure_pnpm
   if workspace_partial; then return 0; fi
   # Warm exact product pnpm versions without replacing the Workspace activation link.
-  for repo in . admin cli config datastore domains gui kernel prototype sdk shell ui ui/domain; do
+  for repo in . admin cli config datastore domains gui kernel mcp prototype sdk shell ui ui/domain; do
     version="$(AGENT_REPO_ROOT="$root/$repo" agent_pnpm_version)"
     prefix="$AGENT_SETUP_HOME/pnpm/$version"
     if [[ "$("$prefix/bin/pnpm" --version 2>/dev/null || true)" != "$version" ]]; then
@@ -44,7 +49,7 @@ repo_dependencies() {
   done
   # Never replace integrated links with standalone product installs.
   unset STANDALONE
-  for repo in . domains gui; do
+  for repo in . domains gui mcp; do
     workspace_pnpm "$root/$repo" install --no-frozen-lockfile --prefer-offline
   done
 }
@@ -72,10 +77,10 @@ repo_verify() {
   workspace_check_manifests
   if workspace_partial; then return 0; fi
   local repo
-  for repo in . domains gui; do
+  for repo in . domains gui mcp; do
     [[ -f "$repo/node_modules/.modules.yaml" ]] || agent_die "Missing dependency root: $repo"
   done
-  for repo in config sdk shell admin datastore cli kernel ui prototype domains gui; do
+  for repo in config sdk shell admin datastore cli kernel ui prototype domains gui mcp; do
     # Config contributes only packages/ox to the integrated workspace. Let each
     # profile verify its actual tools/artifacts instead of assuming a root node_modules.
     workspace_profile "$repo" verify

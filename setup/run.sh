@@ -6,7 +6,7 @@ PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$PACKAGE_DIR/lib/common.sh"
 agent_load_config
 agent_resolve_harnesses
-case "${AGENT_SETUP_PROFILE:-}" in config|sdk|gui|cli|admin|domains|shell|datastore|ui|prototype|kernel|workspace) ;; *) agent_die 'Unsupported setup profile';; esac
+case "${AGENT_SETUP_PROFILE:-}" in config|sdk|gui|cli|admin|domains|shell|datastore|ui|prototype|kernel|mcp|workspace) ;; *) agent_die 'Unsupported setup profile';; esac
 repo_checkout() { :; }
 repo_dependencies() { agent_install_repo; }
 source "$PACKAGE_DIR/profiles/$AGENT_SETUP_PROFILE.sh"

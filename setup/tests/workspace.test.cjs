@@ -13,6 +13,7 @@ const repos = [
   'domains',
   'gui',
   'kernel',
+  'mcp',
   'prototype',
   'sdk',
   'shell',
@@ -183,15 +184,36 @@ test('unique local commits block without resetting a previously checked reposito
   assert.equal(git(child, 'branch', '--show-current'), 'feature')
   assert.equal(git(path.join(f.root, 'admin'), 'rev-parse', 'HEAD'), f.pinned)
 })
-test('an unexpected repository is refused before changing Git state', (t) => {
+test('an unreviewed repository is ignored while reviewed children advance', (t) => {
   const f = fixture(t)
-  fs.appendFileSync(
-    path.join(f.root, '.gitmodules'),
-    '\n[submodule "surprise"]\n path = surprise\n url = example\n',
+  git(f.root, 'submodule', 'add', '-b', 'main', f.upstream, 'surprise')
+  git(f.root, 'commit', '-m', 'surprise')
+  git(f.root, 'submodule', 'deinit', '-f', '--all')
+  const r = run(
+    f.root,
+    'bash',
+    [
+      '-euo',
+      'pipefail',
+      '-c',
+      'agent_check_repo() { :; }; agent_die() { echo "$*" >&2; exit 1; }; agent_log() { echo "$*" >&2; }; source "$1"; workspace_update_main >/dev/null; workspace_paths | paste -sd " " -',
+      'test',
+      library,
+    ],
+    { AGENT_REPO_ROOT: f.root },
   )
+  assert.equal(r.status, 0, r.stderr)
+  assert.match(r.stderr, /ignoring unreviewed submodule surprise/)
+  assert.equal(r.stdout.trim(), repos.join(' '))
+  for (const repo of repos) assert.equal(git(path.join(f.root, repo), 'rev-parse', 'HEAD'), f.latest)
+  assert.equal(fs.existsSync(path.join(f.root, 'surprise', '.git')), false)
+})
+test('a missing reviewed repository is refused before changing Git state', (t) => {
+  const f = fixture(t)
+  git(f.root, 'config', '--file', '.gitmodules', '--remove-section', 'submodule.mcp')
   const r = setup(f.root)
   assert.notEqual(r.status, 0)
-  assert.match(r.stderr, /Unreviewed submodule path/)
+  assert.match(r.stderr, /Missing Workspace submodule: mcp/)
   assert.equal(git(path.join(f.root, 'admin'), 'rev-parse', 'HEAD'), f.pinned)
 })
 

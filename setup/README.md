@@ -67,3 +67,6 @@ retain provider inputs and non-secret selections. Git fixtures protect local wor
 A Workspace submodule whose clone is refused (a cloud session without access to that
 repository) leaves the Workspace partial: tools are prepared, product dependencies and
 artifacts are skipped, and the Claude hook names the missing submodules to attach.
+A declared submodule that Workspace preparation does not cover yet is ignored with a
+warning (also reported in the Claude hook context) rather than failing setup; every
+covered repository must remain declared.
