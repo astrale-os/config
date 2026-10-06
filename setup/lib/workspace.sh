@@ -1,14 +1,31 @@
 #!/usr/bin/env bash
 # Workspace-owned Git policy. No reset/clean/stash, and never commit gitlinks.
-workspace_paths() {
+
+# Repositories whose preparation the Workspace profile explicitly composes.
+WORKSPACE_REVIEWED_PATHS='admin cli config datastore domains gui kernel mcp prototype sdk shell ui'
+
+workspace_declared_paths() {
   git -C "$AGENT_REPO_ROOT" config --file .gitmodules --get-regexp '^submodule\..*\.path$' |
-    while read -r key path; do
-      # The explicit preparation below covers these eleven repositories only.
-      case "$path" in
-        admin|cli|config|datastore|domains|gui|kernel|prototype|sdk|shell|ui) printf '%s\n' "$path" ;;
-        *) agent_die "Unreviewed submodule path: $path; update Workspace preparation first" ;;
-      esac
-    done
+    while read -r _ path; do printf '%s\n' "$path"; done
+}
+
+workspace_reviewed() { [[ " $WORKSPACE_REVIEWED_PATHS " == *" $1 "* ]]; }
+
+# Declared submodules that Workspace preparation covers. Any other submodule is
+# ignored: a newly added repository must not break setup for every session.
+workspace_paths() {
+  local path
+  for path in $(workspace_declared_paths); do
+    if workspace_reviewed "$path"; then printf '%s\n' "$path"; fi
+  done
+}
+
+# Declared submodules that Workspace preparation does not cover yet.
+workspace_unreviewed_paths() {
+  local path
+  for path in $(workspace_declared_paths); do
+    workspace_reviewed "$path" || printf '%s\n' "$path"
+  done
 }
 
 workspace_preflight() {
@@ -17,8 +34,13 @@ workspace_preflight() {
     agent_die 'Missing Workspace manifests'
   local path paths
   paths="$(workspace_paths)" || return
-  [[ "$(printf '%s\n' "$paths" | sort -u | wc -l | tr -d ' ')" == 11 ]] ||
-    agent_die 'Expected eleven distinct Workspace submodules'
+  # Product preparation calls each reviewed repository, so all of them stay declared.
+  for path in $WORKSPACE_REVIEWED_PATHS; do
+    grep -Fqx "$path" <<< "$paths" || agent_die "Missing Workspace submodule: $path"
+  done
+  for path in $(workspace_unreviewed_paths); do
+    agent_log "WARNING: ignoring unreviewed submodule $path; update Workspace preparation to cover it"
+  done
   while read -r path; do
     # An empty, uninitialized directory is fine. Existing work is never discarded.
     if [[ -e "$AGENT_REPO_ROOT/$path/.git" ]]; then
