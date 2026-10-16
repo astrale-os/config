@@ -77,9 +77,13 @@ replace it with a branch such as `main`.
 .github/actions/
 ├── setup/           # pnpm + Node.js + install
 ├── ci/              # lint, typecheck, test, build
+├── docker/          # Build, push and copy Docker images (see docker/README.md)
+├── domains/         # Qualify and publish Astrale Domains (see domains/README.md)
+├── merge-guard/     # Block a PR while dependency repos have an open PR on its branch
 ├── publish/
 │   ├── jsr/         # Publish to JSR
 │   ├── npm/         # Publish to one npm-compatible registry
+│   ├── packages/    # Publish a repo's packages to GitHub Packages and npm
 │   └── mirror-npm-to-github/ # Mirror authoritative npm tarballs privately
 └── release/         # Release Please
 ```
