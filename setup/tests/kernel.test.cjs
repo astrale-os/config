@@ -28,7 +28,7 @@ function fixture(t, legacy = false) {
   }
   write(
     'scripts/setup/repo.sh',
-    'export AGENT_SETUP_PROFILE=kernel AGENT_SETUP_BROWSER=0 AGENT_SETUP_ASTRALE_CLI=0 KERNEL_SETUP_NATIVE_FALKORDB=0 KERNEL_SETUP_DOCKER=0\n',
+    'export AGENT_SETUP_PROFILE=kernel AGENT_SETUP_BROWSER=0 AGENT_SETUP_ASTRALE_CLI=0 KERNEL_SETUP_DOCKER=0\n',
   )
   write('.nvmrc', '26.7.0\n')
   write('.bun-version', '1.4.2\n')
@@ -223,6 +223,21 @@ test('standalone provider preparation does not duplicate the root Legacy CLI bui
   const result = f.shell('pnpm() { echo unexpected-build >&2; return 99; }; repo_prepare')
   assert.equal(result.status, 0, result.stderr)
   assert.equal(result.stdout, '')
+})
+
+test('Docker selection prepares and verifies only the engine, reading no image from the checkout', (t) => {
+  const f = fixture(t)
+  const result = f.shell(
+    probes +
+      'docker() { printf "%s\\n" "$*" >> "$AGENT_REPO_ROOT/docker-calls"; }; KERNEL_SETUP_DOCKER=1; repo_prepare; repo_verify',
+  )
+  assert.equal(result.status, 0, result.stderr)
+  const calls = fs.readFileSync(path.join(f.root, 'docker-calls'), 'utf8').trim().split('\n')
+  assert.ok(calls.includes('info') && calls.includes('compose version'), calls.join(', '))
+  assert.deepEqual(
+    calls.filter((call) => call !== 'info' && call !== 'compose version'),
+    [],
+  )
 })
 
 test('integrated artifact preparation builds exactly a declared Legacy owner and rejects unmatched filters', (t) => {

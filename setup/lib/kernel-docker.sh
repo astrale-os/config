@@ -1,21 +1,13 @@
 #!/usr/bin/env bash
 # Only opted-in cloud preparation installs/starts Docker. Local check mode never does.
-kernel_docker_image() {
-  (cd "$AGENT_REPO_ROOT" && node --input-type=module -e "import { DEFAULT_IMAGE } from './backend/falkordb/evidence/lib/falkordb.mjs'; console.log(DEFAULT_IMAGE)")
-}
+# Kernel tests pin and pull their own images; preparation readies only the engine.
 kernel_prepare_docker() {
   if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
     agent_system_install docker.io docker-compose-v2
   fi
   kernel_start_docker
-  local image
-  image="$(kernel_docker_image)"
-  if ! docker image inspect "$image" >/dev/null 2>&1; then
-    [[ "$AGENT_SETUP_TOOLS" != check ]] || agent_die "Pull the pinned FalkorDB image first: $image"
-    docker pull "$image"
-  fi
   docker compose version
-  agent_log 'Docker engine and pinned functional FalkorDB image are ready; no database started'
+  agent_log 'Docker engine is ready; no container started'
 }
 
 # Resume only the installed service: no package installation or image download.
@@ -37,7 +29,6 @@ kernel_resume_docker() {
   command -v docker >/dev/null || agent_die "Prepared Docker executable is missing"
   docker compose version >/dev/null
   kernel_start_docker
-  docker image inspect "$(kernel_docker_image)" >/dev/null || agent_die "Prepared FalkorDB image is missing; rerun explicit setup"
 }
 
 # A reboot can recycle the saved PID for an unrelated process. Never kill it.

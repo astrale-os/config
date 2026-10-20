@@ -95,7 +95,6 @@ repo_verify() {
 }
 repo_fingerprint() {
   local root="$AGENT_REPO_ROOT" repo
-  printf '%s\0%s\0' "$KERNEL_SETUP_NATIVE_FALKORDB" "$KERNEL_SETUP_DOCKER"
   # Root Git does not enumerate files within submodules. Include each child's inputs,
   # but not HEAD or source edits, so normal development does not refresh branches.
   for repo in $(workspace_paths); do
@@ -104,10 +103,11 @@ repo_fingerprint() {
       ( export AGENT_REPO_ROOT="$root/$repo"; unset -f repo_fingerprint; agent_setup_fingerprint )
     fi
   done
+  # The Kernel profile owns its provider selection.
   ( export AGENT_REPO_ROOT="$root/kernel"; source "$PACKAGE_DIR/profiles/kernel.sh"; repo_fingerprint )
 }
 repo_environment() {
-  printf 'export KERNEL_SETUP_NATIVE_FALKORDB=%q KERNEL_SETUP_DOCKER=%q\n' "$KERNEL_SETUP_NATIVE_FALKORDB" "$KERNEL_SETUP_DOCKER"
+  printf 'export KERNEL_SETUP_DOCKER=%q\n' "$KERNEL_SETUP_DOCKER"
 }
 
 repo_resume() { workspace_profile kernel resume; }
