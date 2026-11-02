@@ -31,7 +31,7 @@ function fixture(t, legacy = false) {
     'export AGENT_SETUP_PROFILE=kernel AGENT_SETUP_BROWSER=0 AGENT_SETUP_ASTRALE_CLI=0 KERNEL_SETUP_DOCKER=0\n',
   )
   write('.nvmrc', '26.7.0\n')
-  write('.bun-version', '1.4.2\n')
+  write('.bun-version', '1.4.4\n')
   write('package.json', '{"packageManager":"pnpm@12.1.0"}')
   const packages = legacy ? [...sourcePackages, ...legacyPackages] : [...sourcePackages]
   const workspace = (names = packages) =>
@@ -262,11 +262,11 @@ function integratedFixture(f) {
   const root = path.join(f.root, 'integrated')
   fs.mkdirSync(root)
   fs.symlinkSync(f.root, path.join(root, 'kernel'))
-  fs.writeFileSync(path.join(root, '.bun-version'), '1.4.2\n')
+  fs.writeFileSync(path.join(root, '.bun-version'), '1.4.4\n')
   for (const name of ['cli', 'prototype']) {
     fs.mkdirSync(path.join(root, name))
     fs.writeFileSync(path.join(root, name, '.git'), 'fixture')
-    fs.writeFileSync(path.join(root, name, '.bun-version'), '1.4.2\n')
+    fs.writeFileSync(path.join(root, name, '.bun-version'), '1.4.4\n')
   }
   return 'export AGENT_REPO_ROOT="$AGENT_REPO_ROOT/integrated" AGENT_SETUP_BROWSER=1 AGENT_SETUP_ASTRALE_CLI=1; source "$PACKAGE_DIR/profiles/workspace.sh"; '
 }
