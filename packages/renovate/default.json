@@ -8,7 +8,7 @@
   "packageRules": [
     {
       "groupName": "all non-major",
-      "matchPackagePatterns": ["*"],
+      "matchPackageNames": ["*"],
       "matchUpdateTypes": ["minor", "patch"]
     }
   ]

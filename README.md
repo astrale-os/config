@@ -21,7 +21,7 @@ Repository-level GitHub merge policy is declared and reconciled from
 
 ## Installation
 
-Development defaults to **Node.js 26.7.0** and also supports Node.js 24. pnpm
+Development defaults to **Node.js 26.13.0** and also supports Node.js 24. pnpm
 **12.1.0** is required.
 
 For repository development, run `STANDALONE=true pnpm install --frozen-lockfile` from the root of
