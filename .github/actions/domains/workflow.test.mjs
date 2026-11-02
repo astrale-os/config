@@ -18,7 +18,7 @@ test('reusable workflows expose plug-and-play callers without Domain inputs or l
   }
   assert.match(ci, /uses: \$\/\.github\/actions\/domains\/qualify/u)
   assert.match(publish, /uses: \$\/\.github\/actions\/domains\/publish/u)
-  assert.match(qualifyAction, /node-version: 26\.7\.0/u)
+  assert.match(qualifyAction, /node-version: 26\.13\.0/u)
   assert.doesNotMatch(qualifyAction, /node-version-file/u)
 })
 
