@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { resolveReleaseSha } from './resolve-release-sha.mjs'
+import { resolveReleaseRevisions, resolveReleaseSha } from './resolve-release-sha.mjs'
 import { releaseOutputs, runRelease, writeOutputs } from './run.mjs'
 
 const sha = 'a'.repeat(40)
@@ -39,6 +39,33 @@ test('release outputs preserve named/root fields, renamed action keys, and exact
     paths_released: '[]',
     prs_created: false,
   })
+})
+
+test('release outputs resolve releases merged at different revisions to their own tags', () => {
+  const later = 'b'.repeat(40)
+  const outputs = releaseOutputs(
+    [
+      { path: 'packages/shell', version: '0.6.0', sha, tagName: 'shell-v0.6.0' },
+      { path: 'domain', version: '0.1.3', sha: later, tagName: 'shell-domain-v0.1.3' },
+    ],
+    [],
+  )
+  assert.throws(
+    () => resolveReleaseSha(outputs.paths_released, JSON.stringify(outputs)),
+    /share one exact commit SHA/u,
+  )
+  assert.deepEqual(
+    resolveReleaseRevisions(outputs.paths_released, JSON.stringify(outputs), {
+      requireShared: false,
+    }),
+    {
+      sha: undefined,
+      releases: [
+        { path: 'packages/shell', sha, tag: 'shell-v0.6.0' },
+        { path: 'domain', sha: later, tag: 'shell-domain-v0.1.3' },
+      ],
+    },
+  )
 })
 
 test('runner loads separate manifests in the upstream release-then-PR order and filters no-op results', async () => {

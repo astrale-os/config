@@ -237,8 +237,34 @@ jobs:
 | `manifest-file` | `.release-please-manifest.json` | Path to manifest file               |
 | `target-branch` | repository default branch       | Branch Release Please should target |
 | `renderer` | none | Checked-out ES module that generates PR Markdown from structured release data |
+| `require-shared-release-sha` | `'true'` | Fail when the releases created in one run have different commit SHAs |
 
-**Outputs:** `releases_created`, `paths_released`, `prs_created`, `pr`, `prs`
+**Outputs:** `releases_created`, `paths_released`, `release_sha`, `releases`, `prs_created`, `pr`, `prs`
+
+`releases` is a JSON array of `{ path, sha, tag }`, one entry per created release in
+`paths_released` order. Each `sha` is the exact 40-character commit Release Please tagged for that
+release, never the triggering workflow's `github.sha`. `release_sha` is set only when every release
+shares one commit.
+
+With separate release pull requests, two of them can merge before one Release Please run: GitHub
+keeps only the newest pending run of a concurrency group, and that run creates both releases, each at
+its own merge commit. By default the action then fails, which protects callers that publish
+everything from `release_sha`. Callers that publish each package separately set
+`require-shared-release-sha: 'false'` and dispatch their publisher once per `releases` entry, one
+after the other and in their own dependency order:
+
+```yaml
+- id: release
+  uses: astrale-os/config/.github/actions/release@<CONFIG_ACTION_SHA>
+  with:
+    token: ${{ github.token }}
+    require-shared-release-sha: 'false'
+# later, in a single job: for each entry of fromJSON(steps.release.outputs.releases), run
+# `gh workflow run publish.yml -f release-sha=<sha> -f release-path=<path>` and wait for it.
+```
+
+Do not fan the dispatches out in parallel: a publish workflow with a `concurrency` group keeps
+only one pending run, so concurrent dispatches would replace one another.
 
 The PR outputs retain Release Please's metadata so callers using the repository `GITHUB_TOKEN`
 can explicitly qualify the generated PR revision. GitHub suppresses workflow events created by

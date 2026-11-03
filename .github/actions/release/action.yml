@@ -17,14 +17,22 @@ inputs:
   renderer:
     description: Optional checked-out ES module rendering structured releases before PR creation
     required: false
+  require-shared-release-sha:
+    description: >-
+      Fail when the releases created in one invocation have different commit SHAs. Set to 'false'
+      to publish each entry of the releases output at its own SHA instead.
+    default: 'true'
 
 outputs:
   releases_created:
     description: Whether any releases were created
     value: ${{ steps.render.outputs.releases_created || steps.release.outputs.releases_created }}
   release_sha:
-    description: Exact revision shared by every release created in this invocation
+    description: Exact revision shared by every release created in this invocation, empty when they differ
     value: ${{ steps.release-revision.outputs.sha }}
+  releases:
+    description: JSON array of {path, sha, tag}, one per created release, each at its own exact tag revision
+    value: ${{ steps.release-revision.outputs.releases }}
   paths_released:
     description: JSON array of paths that were released
     value: ${{ steps.render.outputs.paths_released || steps.release.outputs.paths_released }}
@@ -78,4 +86,5 @@ runs:
       env:
         RELEASE_OUTPUTS: ${{ toJSON(steps.render.outputs.releases_created != '' && steps.render.outputs || steps.release.outputs) }}
         PATHS_RELEASED: ${{ steps.render.outputs.paths_released || steps.release.outputs.paths_released }}
+        REQUIRE_SHARED_RELEASE_SHA: ${{ inputs.require-shared-release-sha }}
       run: node "${{ github.action_path }}/resolve-release-sha.mjs"
