@@ -33,6 +33,12 @@
 #   GH_PACKAGES_TOKEN    token with packages:write (the repo's GITHUB_TOKEN)
 #   GITHUB_STEP_SUMMARY  file to append a human summary to (optional)
 #   RUNNER_TEMP          scratch dir (optional; defaults to a mktemp dir)
+#   REGISTRY_VISIBILITY_TIMEOUT_MINUTES  bound for each version / dist-tag
+#                        visibility check, 1-60 (optional; default 15)
+#
+# Resuming: a re-run of a failed job skips every version already published on
+# a registry (after re-verifying its visibility and dist-tag), then continues
+# with the first unpublished package in producer order.
 # Flags:
 #   --dry-run            decide + run skip-checks, but never pack/publish
 set -u
@@ -176,17 +182,44 @@ npm_tag_for() {
   esac
 }
 
+# Registry propagation bound. npm can acknowledge a publish several minutes
+# before the immutable version (as seen by pnpm) and its channel tag are visible
+# from every registry edge. Both checks stay fail-closed: they poll until the
+# bound and then stop the release, so a dependent never starts before its
+# producer is visible. Tests override the attempts and delay to stay instant.
+VISIBILITY_TIMEOUT_MINUTES="${REGISTRY_VISIBILITY_TIMEOUT_MINUTES:-15}"
+case "$VISIBILITY_TIMEOUT_MINUTES" in
+  ''|*[!0-9]*|0*)
+    echo "::error title=Publication stopped::registry-visibility-timeout-minutes must be a whole number of minutes between 1 and 60" >&2
+    exit 1
+    ;;
+esac
+if [ "$VISIBILITY_TIMEOUT_MINUTES" -gt 60 ]; then
+  echo "::error title=Publication stopped::registry-visibility-timeout-minutes must be a whole number of minutes between 1 and 60" >&2
+  exit 1
+fi
+
+# Echoes "<attempts> <delay>" for a check, from its env overrides or the bound.
+poll_plan() {
+  local attempts_override="$1" delay_override="$2"
+  local delay="${delay_override:-10}" attempts
+  if [ -n "$attempts_override" ]; then
+    attempts="$attempts_override"
+  elif [ "$delay" -gt 0 ]; then
+    # One immediate attempt, then one attempt after each delay until the bound.
+    attempts=$(( VISIBILITY_TIMEOUT_MINUTES * 60 / delay + 1 ))
+  else
+    attempts=1
+  fi
+  printf '%s %s' "$attempts" "$delay"
+}
+
 # Prove that a registry's expected release-channel tag resolves to the exact
-# immutable version. Registry propagation can lag briefly after npm publish, so
-# real workflows retry; tests override the attempts and delay to remain instant.
+# immutable version.
 verify_dist_tag() {
   local name="$1" version="$2" tag="$3" reg="$4" cfg="$5"
-  # npm can acknowledge a publish before the immutable version and its mutable
-  # channel tag are visible from every registry edge. Keep this verification
-  # fail-closed, but allow up to five minutes for normal propagation.
-  local attempts="${DIST_TAG_VERIFY_ATTEMPTS:-60}"
-  local delay="${DIST_TAG_VERIFY_DELAY_SECONDS:-5}"
-  local attempt=1 out code
+  local attempts delay attempt=1 out code
+  read -r attempts delay < <(poll_plan "${DIST_TAG_VERIFY_ATTEMPTS:-}" "${DIST_TAG_VERIFY_DELAY_SECONDS:-}")
 
   while [ "$attempt" -le "$attempts" ]; do
     # Use the registry's dedicated dist-tag endpoint. GitHub Packages can return
@@ -195,9 +228,11 @@ verify_dist_tag() {
     # dedicated endpoint is the authoritative API for this mutable metadata.
     out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$cfg" npm dist-tag ls "$name" --registry="$reg" 2>&1 ); code=$?
     if [ "$code" = "0" ] && printf '%s\n' "$out" | grep -Fxq "$tag: $version"; then
+      [ "$attempt" -eq 1 ] || echo "dist-tag $name@$tag -> $version is visible on $reg after $attempt attempts"
       return 0
     fi
     if [ "$attempt" -lt "$attempts" ]; then
+      echo "waiting for dist-tag $name@$tag -> $version on $reg (attempt $attempt/$attempts, next in ${delay}s, bound ${VISIBILITY_TIMEOUT_MINUTES}m)"
       sleep "$delay"
     fi
     attempt=$((attempt + 1))
@@ -209,19 +244,22 @@ verify_dist_tag() {
 
 # Prove that an acknowledged immutable publication is fetchable through the
 # workspace package manager before a dependent package or qualifier starts.
-# npm's mutable metadata can propagate ahead of pnpm's exact packument edge.
+# This deliberately uses `pnpm view <name>@<version>`, the exact-version lookup
+# consumers resolve through: npm's own metadata can propagate ahead of pnpm's
+# packument edge, so an npm-only check could let a consumer install fail.
 verify_version() {
   local spec="$1" reg="$2" cfg="$3"
-  local attempts="${VERSION_VERIFY_ATTEMPTS:-60}"
-  local delay="${VERSION_VERIFY_DELAY_SECONDS:-5}"
-  local attempt=1 out code
+  local attempts delay attempt=1 out code
+  read -r attempts delay < <(poll_plan "${VERSION_VERIFY_ATTEMPTS:-}" "${VERSION_VERIFY_DELAY_SECONDS:-}")
 
   while [ "$attempt" -le "$attempts" ]; do
     out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$cfg" pnpm view "$spec" version --registry="$reg" 2>&1 ); code=$?
     if [ "$code" = "0" ] && printf '%s\n' "$out" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]'; then
+      [ "$attempt" -eq 1 ] || echo "$spec is visible on $reg after $attempt attempts"
       return 0
     fi
     if [ "$attempt" -lt "$attempts" ]; then
+      echo "waiting for $spec on $reg (attempt $attempt/$attempts, next in ${delay}s, bound ${VISIBILITY_TIMEOUT_MINUTES}m): $(compact "$out" | cut -c1-160)"
       sleep "$delay"
     fi
     attempt=$((attempt + 1))
@@ -301,11 +339,11 @@ publish_one() {
     esac
     if { [ "$e" = "0" ] || [ "$DRY_RUN" != "1" ]; }; then
       if ! verify_version "$spec" "$NPM_REG" "$NEUTRAL"; then
-        publish_error "npm immutable version $spec is not registry-visible"
+        publish_error "npm immutable version $spec is not registry-visible after ${VISIBILITY_TIMEOUT_MINUTES} minutes. Re-run the failed job to resume: versions already published are skipped."
         return 1
       fi
       if ! verify_dist_tag "$name" "$version" "$tag" "$NPM_REG" "$NEUTRAL"; then
-        publish_error "npm dist-tag $name@$tag does not resolve to $version"
+        publish_error "npm dist-tag $name@$tag does not resolve to $version after ${VISIBILITY_TIMEOUT_MINUTES} minutes"
         return 1
       fi
     fi
@@ -347,7 +385,7 @@ publish_one() {
         ;;
     esac
     if { [ "$e" = "0" ] || [ "$DRY_RUN" != "1" ]; } && ! verify_dist_tag "$name" "$version" "$tag" "$GH_REG" "$GH_NEUTRAL"; then
-      publish_error "GitHub Packages dist-tag $name@$tag does not resolve to $version"
+      publish_error "GitHub Packages dist-tag $name@$tag does not resolve to $version after ${VISIBILITY_TIMEOUT_MINUTES} minutes"
       return 1
     fi
   else

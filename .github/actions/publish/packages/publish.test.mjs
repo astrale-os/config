@@ -10,11 +10,17 @@ const publisher = fileURLToPath(new URL('./publish.sh', import.meta.url))
 const publisherSource = await readFile(publisher, 'utf8')
 const actionSource = await readFile(new URL('./action.yml', import.meta.url), 'utf8')
 
-test('allows five minutes for immutable version and dist-tag propagation by default', () => {
-  assert.match(publisherSource, /VERSION_VERIFY_ATTEMPTS:-60/)
-  assert.match(publisherSource, /VERSION_VERIFY_DELAY_SECONDS:-5/)
-  assert.match(publisherSource, /DIST_TAG_VERIFY_ATTEMPTS:-60/)
-  assert.match(publisherSource, /DIST_TAG_VERIFY_DELAY_SECONDS:-5/)
+test('allows fifteen minutes for version and dist-tag propagation by default', () => {
+  assert.match(publisherSource, /REGISTRY_VISIBILITY_TIMEOUT_MINUTES:-15\}/u)
+  assert.match(publisherSource, /local delay="\$\{delay_override:-10\}"/u)
+  assert.match(
+    actionSource,
+    /registry-visibility-timeout-minutes:\n(?: {4}.+\n)*? {4}default: '15'/u,
+  )
+  assert.match(
+    actionSource,
+    /REGISTRY_VISIBILITY_TIMEOUT_MINUTES: \$\{\{ inputs\.registry-visibility-timeout-minutes \}\}/u,
+  )
 })
 
 test('offers no npm token input or registry-token fallback', () => {
@@ -104,6 +110,7 @@ const pnpmStub = [
   '#!/usr/bin/env bash',
   'set -eu',
   'if [ "${1:-}" = view ]; then',
+  '  printf "pnpm %s\\n" "$*" >> "$FAKE_LOOKUP_LOG"',
   '  spec="${2:-}"',
   '  case ",${FAKE_EXISTING:-}," in',
   '    *",$spec,"*) printf "%s\\n" "${spec##*@}"; exit 0 ;;',
@@ -139,11 +146,24 @@ const pnpmStub = [
   '',
 ].join('\n')
 
+const sleepStub = ['#!/usr/bin/env bash', 'printf "%s\\n" "$1" >> "$FAKE_SLEEP_LOG"', ''].join('\n')
+
+async function readLines(path) {
+  try {
+    return (await readFile(path, 'utf8')).trim().split('\n').filter(Boolean)
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+    return []
+  }
+}
+
 async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }) {
   const root = await mkdtemp(join(tmpdir(), 'astrale-publisher-test-'))
   const fakeBin = join(root, 'bin')
   const runnerTemp = join(root, 'runner')
   const publishLog = join(root, 'publish.log')
+  const lookupLog = join(root, 'lookup.log')
+  const sleepLog = join(root, 'sleep.log')
 
   try {
     await Promise.all([mkdir(fakeBin), mkdir(runnerTemp), mkdir(join(root, 'published'))])
@@ -156,8 +176,9 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
     await Promise.all([
       writeFile(join(fakeBin, 'npm'), npmStub),
       writeFile(join(fakeBin, 'pnpm'), pnpmStub),
+      writeFile(join(fakeBin, 'sleep'), sleepStub),
     ])
-    await Promise.all([chmod(join(fakeBin, 'npm'), 0o755), chmod(join(fakeBin, 'pnpm'), 0o755)])
+    await Promise.all(['npm', 'pnpm', 'sleep'].map((bin) => chmod(join(fakeBin, bin), 0o755)))
 
     const fakeTags = dirs
       .map((dir) => {
@@ -196,6 +217,8 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
         MIRROR_PUBLIC_PACKAGES: 'true',
         NPM_TOKEN: '',
         FAKE_PUBLISH_LOG: publishLog,
+        FAKE_LOOKUP_LOG: lookupLog,
+        FAKE_SLEEP_LOG: sleepLog,
         FAKE_PUBLISHED_DIR: join(root, 'published'),
         FAKE_TAG_COUNTER: join(root, 'tag-counter'),
         FAKE_TAGS: fakeTags,
@@ -208,14 +231,11 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
       },
     })
 
-    let calls = []
-    try {
-      calls = (await readFile(publishLog, 'utf8')).trim().split('\n').filter(Boolean)
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error
-    }
+    const [calls, lookups, sleeps] = await Promise.all(
+      [publishLog, lookupLog, sleepLog].map(readLines),
+    )
 
-    return { ...result, calls, output: `${result.stdout}${result.stderr}` }
+    return { ...result, calls, lookups, sleeps, output: `${result.stdout}${result.stderr}` }
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -307,17 +327,104 @@ test('waits for a published dist-tag to propagate before continuing', async () =
 
 test('waits for an acknowledged immutable version to become registry-visible', async () => {
   const result = await runPublisher({
-    manifests: { producer: npmPackages.producer },
-    dirs: ['producer'],
+    manifests: npmPackages,
+    dirs: ['producer', 'consumer'],
     extraEnv: {
-      VERSION_VERIFY_ATTEMPTS: '3',
+      VERSION_VERIFY_ATTEMPTS: '6',
       VERSION_VERIFY_DELAY_SECONDS: '0',
-      FAKE_VERSION_DELAY_CALLS: '2',
+      FAKE_VERSION_DELAY_CALLS: '4',
     },
   })
 
   assert.equal(result.status, 0, result.output)
+  assert.equal(result.calls.length, 2)
+  assert.match(
+    result.output,
+    /waiting for producer@1\.0\.0 on https:\/\/registry\.npmjs\.org \(attempt 4\/6/u,
+  )
+  assert.match(
+    result.output,
+    /producer@1\.0\.0 is visible on https:\/\/registry\.npmjs\.org after 5 attempts/u,
+  )
+  assert.ok(
+    result.output.indexOf('after 5 attempts') < result.output.indexOf('publish package: consumer'),
+    'the consumer must start only after its producer is visible',
+  )
+})
+
+test('checks visibility with an exact-version pnpm lookup on the publish registry', async () => {
+  const result = await runPublisher({
+    manifests: { producer: npmPackages.producer },
+    dirs: ['producer'],
+  })
+
+  assert.equal(result.status, 0, result.output)
+  assert.deepEqual(result.lookups, [
+    'pnpm view producer@1.0.0 version --registry=https://registry.npmjs.org',
+  ])
+})
+
+test('fails closed before a consumer when a version never becomes visible', async () => {
+  const result = await runPublisher({
+    manifests: npmPackages,
+    dirs: ['producer', 'consumer'],
+    extraEnv: {
+      VERSION_VERIFY_ATTEMPTS: '3',
+      VERSION_VERIFY_DELAY_SECONDS: '0',
+      FAKE_VERSION_DELAY_CALLS: '1000',
+    },
+  })
+
+  assert.equal(result.status, 1)
   assert.equal(result.calls.length, 1)
+  assert.equal(result.lookups.length, 3)
+  assert.match(
+    result.output,
+    /pnpm visibility check for producer@1\.0\.0 on https:\/\/registry\.npmjs\.org returned/u,
+  )
+  assert.match(
+    result.output,
+    /npm immutable version producer@1\.0\.0 is not registry-visible after 15 minutes\. Re-run the failed job to resume/u,
+  )
+  assert.doesNotMatch(result.output, /publish package: consumer/)
+})
+
+test('derives the poll count from the configured visibility bound', async () => {
+  const result = await runPublisher({
+    manifests: { producer: npmPackages.producer },
+    dirs: ['producer'],
+    extraEnv: {
+      REGISTRY_VISIBILITY_TIMEOUT_MINUTES: '2',
+      VERSION_VERIFY_ATTEMPTS: '',
+      VERSION_VERIFY_DELAY_SECONDS: '',
+      FAKE_VERSION_DELAY_CALLS: '1000',
+    },
+  })
+
+  // 2 minutes at the default 10-second interval: an immediate attempt plus 12 more.
+  assert.equal(result.status, 1)
+  assert.equal(result.lookups.length, 13)
+  assert.deepEqual(result.sleeps, Array(12).fill('10'))
+  assert.match(result.output, /not registry-visible after 2 minutes/u)
+})
+
+test('rejects an invalid visibility bound before publishing anything', async () => {
+  for (const value of ['0', '61', 'soon', '']) {
+    const result = await runPublisher({
+      manifests: { producer: npmPackages.producer },
+      dirs: ['producer'],
+      extraEnv: { REGISTRY_VISIBILITY_TIMEOUT_MINUTES: value },
+    })
+
+    if (value === '') {
+      // An empty value (unset input) falls back to the default bound.
+      assert.equal(result.status, 0, result.output)
+      continue
+    }
+    assert.equal(result.status, 1, value)
+    assert.deepEqual(result.calls, [])
+    assert.match(result.output, /registry-visibility-timeout-minutes must be a whole number/u)
+  }
 })
 
 test('stops on an inconclusive producer lookup', async () => {
