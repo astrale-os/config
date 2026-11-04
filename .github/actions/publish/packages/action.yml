@@ -35,6 +35,13 @@ inputs:
   tarballs-json:
     description: Optional directory-to-tarball map prepared and verified by an owning workflow.
     default: '{}'
+  registry-visibility-timeout-minutes:
+    description: >
+      Minutes (1-60) to wait for each published immutable version and dist-tag to
+      become visible on its registry before failing closed. A dependent package
+      never starts before its producer is visible. Re-running a failed job resumes:
+      versions already published are skipped.
+    default: '15'
 
 runs:
   using: composite
@@ -123,4 +130,5 @@ runs:
         MIRROR_PUBLIC_PACKAGES: ${{ inputs.mirror-public-packages }}
         PRERELEASE_TAG: ${{ inputs.prerelease-tag }}
         PUBLISH_TARBALLS_JSON: ${{ inputs.tarballs-json }}
+        REGISTRY_VISIBILITY_TIMEOUT_MINUTES: ${{ inputs.registry-visibility-timeout-minutes }}
       run: bash "${{ github.action_path }}/publish.sh"
