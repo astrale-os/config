@@ -313,7 +313,7 @@ test('complete Workspace validates Kernel ownership before runtimes while partia
     [
       'workspace_update_main() { :; }',
       'workspace_check_manifests() { :; }',
-      'workspace_missing_paths() { printf "datastore\\n"; }',
+      'workspace_missing_paths() { printf "prototype\\n"; }',
     ].join('\n') +
     '\n'
   const complete = f.shell(prefix + 'workspace_partial() { return 1; }; repo_checkout')

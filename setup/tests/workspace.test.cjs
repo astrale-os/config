@@ -9,7 +9,6 @@ const repos = [
   'admin',
   'cli',
   'config',
-  'datastore',
   'domains',
   'gui',
   'kernel',
@@ -96,20 +95,20 @@ test('a refused clone leaves a partial Workspace while every other child advance
   const f = fixture(t)
   git(f.root, 'submodule', 'deinit', '-f', '--all')
   // Simulate a cloud session without access to one repository: its clone fails.
-  fs.rmSync(path.join(f.root, '.git', 'modules', 'datastore'), { recursive: true, force: true })
+  fs.rmSync(path.join(f.root, '.git', 'modules', 'prototype'), { recursive: true, force: true })
   git(
     f.root,
     'config',
     '--file',
     '.gitmodules',
-    'submodule.datastore.url',
+    'submodule.prototype.url',
     path.join(f.root, 'missing'),
   )
   const r = setup(f.root)
   assert.equal(r.status, 0, r.stderr)
-  for (const repo of repos.filter((repo) => repo !== 'datastore'))
+  for (const repo of repos.filter((repo) => repo !== 'prototype'))
     assert.equal(git(path.join(f.root, repo), 'rev-parse', 'HEAD'), f.latest)
-  assert.equal(fs.existsSync(path.join(f.root, 'datastore', '.git')), false)
+  assert.equal(fs.existsSync(path.join(f.root, 'prototype', '.git')), false)
   const missing = run(
     f.root,
     'bash',
@@ -122,7 +121,7 @@ test('a refused clone leaves a partial Workspace while every other child advance
     { AGENT_REPO_ROOT: f.root },
   )
   assert.equal(missing.status, 0, missing.stderr)
-  assert.equal(missing.stdout.trim(), 'datastore\npartial')
+  assert.equal(missing.stdout.trim(), 'prototype\npartial')
 })
 test('a complete Workspace is not partial', (t) => {
   const f = fixture(t)

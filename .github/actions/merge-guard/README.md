@@ -44,7 +44,6 @@ jobs:
 | -------------- | ---------------------------- |
 | `kernel`       | `[]` (none)                  |
 | `typegraph`    | `[]`                         |
-| `datastore`    | `[]`                         |
 | `adapters`     | `["kernel", "typegraph"]`    |
 | `shell`        | `["kernel"]`                 |
 | `sdk`          | `["kernel"]`                 |

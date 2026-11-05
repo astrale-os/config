@@ -1,6 +1,6 @@
 {
   "organization": "astrale-os",
-  "repositories": ["cli", "config", "datastore", "domains", "gui", "kernel", "sdk", "shell", "ui"],
+  "repositories": ["cli", "config", "domains", "gui", "kernel", "sdk", "shell", "ui"],
   "settings": {
     "allow_merge_commit": false,
     "allow_rebase_merge": false,

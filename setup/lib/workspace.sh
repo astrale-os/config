@@ -2,7 +2,7 @@
 # Workspace-owned Git policy. No reset/clean/stash, and never commit gitlinks.
 
 # Repositories whose preparation the Workspace profile explicitly composes.
-WORKSPACE_REVIEWED_PATHS='admin cli config datastore domains gui kernel mcp prototype sdk shell ui'
+WORKSPACE_REVIEWED_PATHS='admin cli config domains gui kernel mcp prototype sdk shell ui'
 
 workspace_declared_paths() {
   git -C "$AGENT_REPO_ROOT" config --file .gitmodules --get-regexp '^submodule\..*\.path$' |
