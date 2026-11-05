@@ -36,7 +36,7 @@ repo_dependencies() {
   agent_ensure_pnpm
   if workspace_partial; then return 0; fi
   # Warm exact product pnpm versions without replacing the Workspace activation link.
-  for repo in . admin cli config datastore domains gui kernel mcp prototype sdk shell ui ui/domain; do
+  for repo in . admin cli config domains gui kernel mcp prototype sdk shell ui ui/domain; do
     version="$(AGENT_REPO_ROOT="$root/$repo" agent_pnpm_version)"
     prefix="$AGENT_SETUP_HOME/pnpm/$version"
     if [[ "$("$prefix/bin/pnpm" --version 2>/dev/null || true)" != "$version" ]]; then
@@ -80,7 +80,7 @@ repo_verify() {
   for repo in . domains gui mcp; do
     [[ -f "$repo/node_modules/.modules.yaml" ]] || agent_die "Missing dependency root: $repo"
   done
-  for repo in config sdk shell admin datastore cli kernel ui prototype domains gui mcp; do
+  for repo in config sdk shell admin cli kernel ui prototype domains gui mcp; do
     # Config contributes only packages/ox to the integrated workspace. Let each
     # profile verify its actual tools/artifacts instead of assuming a root node_modules.
     workspace_profile "$repo" verify

@@ -6,7 +6,7 @@ inputs:
     description: GitHub token with repo read access
     required: true
   dependencies:
-    description: 'JSON array of dependency repos (e.g., ["kernel", "datastore"])'
+    description: 'JSON array of dependency repos (e.g., ["kernel", "shell"])'
     default: '[]'
   org:
     description: GitHub organization name
