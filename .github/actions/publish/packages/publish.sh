@@ -66,6 +66,12 @@ read -r -a PUBLISH_DIR_ARRAY <<< "$PUBLISH_DIRS"
 summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"; return 0; }
 field() { node -p "(require('./$1/package.json').$2)" 2>/dev/null; }
 compact() { printf '%s' "$1" | tr '\n' ' ' | cut -c1-500; }
+# HTTP status a tarball URL answers to a download ("000" when unreachable).
+tarball_status() {
+  local status
+  status=$(curl --silent --location --output /dev/null --write-out '%{http_code}' --max-time 60 "$1" 2>/dev/null)
+  printf '%s' "${status:-000}"
+}
 
 publish_error() {
   echo "::error title=Publication stopped::$1" >&2
@@ -242,21 +248,30 @@ verify_dist_tag() {
   return 1
 }
 
-# Prove that an acknowledged immutable publication is fetchable through the
+# Prove that an acknowledged immutable publication is installable through the
 # workspace package manager before a dependent package or qualifier starts.
 # This deliberately uses `pnpm view <name>@<version>`, the exact-version lookup
 # consumers resolve through: npm's own metadata can propagate ahead of pnpm's
-# packument edge, so an npm-only check could let a consumer install fail.
+# packument edge, so an npm-only check could let a consumer install fail. npm
+# also serves a new version's metadata minutes before its tarball, so the poll
+# continues until the version's `dist.tarball` answers HTTP 200. On failure,
+# `version_failure` states the last unmet condition.
 verify_version() {
   local spec="$1" reg="$2" cfg="$3"
-  local attempts delay attempt=1 out code
+  local attempts delay attempt=1 out code tarball status
   read -r attempts delay < <(poll_plan "${VERSION_VERIFY_ATTEMPTS:-}" "${VERSION_VERIFY_DELAY_SECONDS:-}")
 
   while [ "$attempt" -le "$attempts" ]; do
-    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$cfg" pnpm view "$spec" version --registry="$reg" 2>&1 ); code=$?
-    if [ "$code" = "0" ] && printf '%s\n' "$out" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]'; then
-      [ "$attempt" -eq 1 ] || echo "$spec is visible on $reg after $attempt attempts"
-      return 0
+    tarball=""
+    out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$cfg" pnpm view "$spec" dist.tarball --registry="$reg" 2>&1 ); code=$?
+    [ "$code" = "0" ] && tarball=$(printf '%s\n' "$out" | grep -m1 -E '^https?://')
+    if [ -n "$tarball" ]; then
+      status=$(tarball_status "$tarball")
+      if [ "$status" = "200" ]; then
+        [ "$attempt" -eq 1 ] || echo "$spec is installable from $reg after $attempt attempts"
+        return 0
+      fi
+      out="tarball $tarball answered HTTP $status"
     fi
     if [ "$attempt" -lt "$attempts" ]; then
       echo "waiting for $spec on $reg (attempt $attempt/$attempts, next in ${delay}s, bound ${VISIBILITY_TIMEOUT_MINUTES}m): $(compact "$out" | cut -c1-160)"
@@ -265,6 +280,11 @@ verify_version() {
     attempt=$((attempt + 1))
   done
 
+  if [ -n "$tarball" ]; then
+    version_failure="npm tarball for $spec is not installable after ${VISIBILITY_TIMEOUT_MINUTES} minutes: $tarball last answered HTTP $status."
+  else
+    version_failure="npm immutable version $spec is not registry-visible after ${VISIBILITY_TIMEOUT_MINUTES} minutes."
+  fi
   echo "::warning::pnpm visibility check for $spec on $reg returned: $(compact "$out")" >&2
   return 1
 }
@@ -293,7 +313,7 @@ for dir in "${PUBLISH_DIR_ARRAY[@]}"; do
   fi
 done
 
-npm_published=""; gh_published=""
+npm_published=""; gh_published=""; version_failure=""
 
 publish_one() {
   local dir="$1" gh npm name version spec e tarball out pub tag
@@ -339,7 +359,7 @@ publish_one() {
     esac
     if { [ "$e" = "0" ] || [ "$DRY_RUN" != "1" ]; }; then
       if ! verify_version "$spec" "$NPM_REG" "$NEUTRAL"; then
-        publish_error "npm immutable version $spec is not registry-visible after ${VISIBILITY_TIMEOUT_MINUTES} minutes. Re-run the failed job to resume: versions already published are skipped."
+        publish_error "$version_failure Re-run the failed job to resume: versions already published are skipped."
         return 1
       fi
       if ! verify_dist_tag "$name" "$version" "$tag" "$NPM_REG" "$NEUTRAL"; then
