@@ -148,20 +148,53 @@ const pnpmStub = [
   '',
 ].join('\n')
 
-// Every tarball download answers 404 until FAKE_TARBALL_DELAY_CALLS downloads have run.
+// Tarball downloads fail as FAKE_TARBALL_FAILURE says (an HTTP 404, an HTTP 200 whose
+// transfer is truncated, or a stalled transfer that spends its whole --max-time on the
+// fake clock) until FAKE_TARBALL_DELAY_CALLS downloads have run.
 const curlStub = [
   '#!/usr/bin/env bash',
   'set -eu',
-  'printf "%s\\n" "${!#}" >> "$FAKE_TARBALL_LOG"',
+  'max_time=""',
+  'while [ "$#" -gt 1 ]; do',
+  '  [ "$1" != --max-time ] || max_time="$2"',
+  '  shift',
+  'done',
+  'printf "%s\\n" "$1" >> "$FAKE_TARBALL_LOG"',
+  'printf "%s\\n" "$max_time" >> "$FAKE_MAX_TIME_LOG"',
   'count=0',
   '[ ! -f "$FAKE_TARBALL_COUNTER" ] || read -r count < "$FAKE_TARBALL_COUNTER"',
   'count=$((count + 1))',
   'printf "%s\\n" "$count" > "$FAKE_TARBALL_COUNTER"',
-  'if [ "$count" -gt "${FAKE_TARBALL_DELAY_CALLS:-0}" ]; then printf 200; else printf 404; fi',
+  'if [ "$count" -gt "${FAKE_TARBALL_DELAY_CALLS:-0}" ]; then printf 200; exit 0; fi',
+  'case "${FAKE_TARBALL_FAILURE:-404}" in',
+  '  404) printf 404 ;;',
+  '  truncated) printf 200; exit 18 ;;',
+  '  stalled)',
+  '    read -r now < "$FAKE_CLOCK"',
+  '    printf "%s\\n" "$((now + max_time))" > "$FAKE_CLOCK"',
+  '    printf 000',
+  '    exit 28',
+  '    ;;',
+  'esac',
   '',
 ].join('\n')
 
-const sleepStub = ['#!/usr/bin/env bash', 'printf "%s\\n" "$1" >> "$FAKE_SLEEP_LOG"', ''].join('\n')
+// A fake clock: `date +%s` reads it and every sleep advances it.
+const clockStart = 1_000_000
+const dateStub = [
+  '#!/usr/bin/env bash',
+  '[ "${1:-}" = +%s ] || { echo "unexpected date command: $*" >&2; exit 9; }',
+  'cat "$FAKE_CLOCK"',
+  '',
+].join('\n')
+
+const sleepStub = [
+  '#!/usr/bin/env bash',
+  'printf "%s\\n" "$1" >> "$FAKE_SLEEP_LOG"',
+  'read -r now < "$FAKE_CLOCK"',
+  'printf "%s\\n" "$((now + $1))" > "$FAKE_CLOCK"',
+  '',
+].join('\n')
 
 async function readLines(path) {
   try {
@@ -180,6 +213,8 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
   const lookupLog = join(root, 'lookup.log')
   const sleepLog = join(root, 'sleep.log')
   const tarballLog = join(root, 'tarball.log')
+  const maxTimeLog = join(root, 'max-time.log')
+  const clock = join(root, 'clock')
 
   try {
     await Promise.all([mkdir(fakeBin), mkdir(runnerTemp), mkdir(join(root, 'published'))])
@@ -194,9 +229,11 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
       writeFile(join(fakeBin, 'pnpm'), pnpmStub),
       writeFile(join(fakeBin, 'sleep'), sleepStub),
       writeFile(join(fakeBin, 'curl'), curlStub),
+      writeFile(join(fakeBin, 'date'), dateStub),
+      writeFile(clock, `${clockStart}\n`),
     ])
     await Promise.all(
-      ['npm', 'pnpm', 'sleep', 'curl'].map((bin) => chmod(join(fakeBin, bin), 0o755)),
+      ['npm', 'pnpm', 'sleep', 'curl', 'date'].map((bin) => chmod(join(fakeBin, bin), 0o755)),
     )
 
     const fakeTags = dirs
@@ -242,6 +279,8 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
         FAKE_TAG_COUNTER: join(root, 'tag-counter'),
         FAKE_TARBALL_LOG: tarballLog,
         FAKE_TARBALL_COUNTER: join(root, 'tarball-counter'),
+        FAKE_MAX_TIME_LOG: maxTimeLog,
+        FAKE_CLOCK: clock,
         FAKE_TAGS: fakeTags,
         VERSION_VERIFY_ATTEMPTS: '1',
         VERSION_VERIFY_DELAY_SECONDS: '0',
@@ -252,8 +291,8 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
       },
     })
 
-    const [calls, lookups, sleeps, downloads] = await Promise.all(
-      [publishLog, lookupLog, sleepLog, tarballLog].map(readLines),
+    const [calls, lookups, sleeps, downloads, maxTimes, [now]] = await Promise.all(
+      [publishLog, lookupLog, sleepLog, tarballLog, maxTimeLog, clock].map(readLines),
     )
 
     return {
@@ -262,6 +301,8 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
       lookups,
       sleeps,
       downloads,
+      maxTimes,
+      elapsed: Number(now) - clockStart,
       output: `${result.stdout}${result.stderr}`,
     }
   } finally {
@@ -440,9 +481,63 @@ test('fails closed within the bound when a visible version tarball is never serv
   assert.equal(result.calls.length, 1)
   assert.equal(result.downloads.length, 13)
   assert.deepEqual(result.sleeps, Array(12).fill('10'))
+  assert.equal(result.elapsed, 120)
   assert.match(
     result.output,
     /npm tarball for producer@1\.0\.0 is not installable after 2 minutes: https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz last answered HTTP 404\. Re-run the failed job to resume/u,
+  )
+  assert.doesNotMatch(result.output, /publish package: consumer/)
+})
+
+test('keeps waiting when a tarball answers HTTP 200 but its download fails', async () => {
+  const result = await runPublisher({
+    manifests: npmPackages,
+    dirs: ['producer', 'consumer'],
+    extraEnv: {
+      VERSION_VERIFY_ATTEMPTS: '4',
+      VERSION_VERIFY_DELAY_SECONDS: '0',
+      FAKE_TARBALL_DELAY_CALLS: '2',
+      FAKE_TARBALL_FAILURE: 'truncated',
+    },
+  })
+
+  assert.equal(result.status, 0, result.output)
+  assert.equal(result.calls.length, 2)
+  assert.equal(result.downloads.length, 4)
+  assert.match(
+    result.output,
+    /\(attempt 2\/4, [^)]*\): tarball https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz answered HTTP 200 but the download failed \(curl exit 18\)/u,
+  )
+  assert.ok(
+    result.output.indexOf('installable from https://registry.npmjs.org after 3 attempts') <
+      result.output.indexOf('publish package: consumer'),
+    'the consumer must start only after its producer tarball downloads completely',
+  )
+})
+
+test('bounds the wait by elapsed time when tarball downloads stall', async () => {
+  const result = await runPublisher({
+    manifests: npmPackages,
+    dirs: ['producer', 'consumer'],
+    extraEnv: {
+      REGISTRY_VISIBILITY_TIMEOUT_MINUTES: '2',
+      VERSION_VERIFY_ATTEMPTS: '',
+      VERSION_VERIFY_DELAY_SECONDS: '',
+      FAKE_TARBALL_DELAY_CALLS: '1000',
+      FAKE_TARBALL_FAILURE: 'stalled',
+    },
+  })
+
+  // Each stalled download spends its whole --max-time, so the 2-minute deadline ends
+  // the wait long before the 13-attempt limit: 60 s, a 10 s pause, then the last 50 s.
+  assert.equal(result.status, 1)
+  assert.equal(result.calls.length, 1)
+  assert.deepEqual(result.maxTimes, ['60', '50'])
+  assert.deepEqual(result.sleeps, ['10'])
+  assert.equal(result.elapsed, 120)
+  assert.match(
+    result.output,
+    /npm tarball for producer@1\.0\.0 is not installable after 2 minutes: https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz last gave no HTTP response \(curl exit 28\)\. Re-run the failed job to resume/u,
   )
   assert.doesNotMatch(result.output, /publish package: consumer/)
 })

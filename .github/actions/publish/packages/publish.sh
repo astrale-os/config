@@ -66,11 +66,21 @@ read -r -a PUBLISH_DIR_ARRAY <<< "$PUBLISH_DIRS"
 summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"; return 0; }
 field() { node -p "(require('./$1/package.json').$2)" 2>/dev/null; }
 compact() { printf '%s' "$1" | tr '\n' ' ' | cut -c1-500; }
-# HTTP status a tarball URL answers to a download ("000" when unreachable).
-tarball_status() {
-  local status
-  status=$(curl --silent --location --output /dev/null --write-out '%{http_code}' --max-time 60 "$1" 2>/dev/null)
-  printf '%s' "${status:-000}"
+# Downloads tarball $1 within $2 seconds. Succeeds only when the transfer
+# completes with HTTP 200; otherwise prints what the URL answered.
+fetch_tarball() {
+  local status code
+  status=$(curl --silent --location --output /dev/null --write-out '%{http_code}' --max-time "$2" "$1" 2>/dev/null); code=$?
+  status="${status:-000}"
+  if [ "$code" = "0" ]; then
+    [ "$status" = "200" ] && return 0
+    printf 'answered HTTP %s' "$status"
+  elif [ "$status" = "000" ]; then
+    printf 'gave no HTTP response (curl exit %s)' "$code"
+  else
+    printf 'answered HTTP %s but the download failed (curl exit %s)' "$status" "$code"
+  fi
+  return 1
 }
 
 publish_error() {
@@ -254,34 +264,44 @@ verify_dist_tag() {
 # consumers resolve through: npm's own metadata can propagate ahead of pnpm's
 # packument edge, so an npm-only check could let a consumer install fail. npm
 # also serves a new version's metadata minutes before its tarball, so the poll
-# continues until the version's `dist.tarball` answers HTTP 200. On failure,
+# continues until the version's `dist.tarball` downloads completely with HTTP
+# 200. The bound is elapsed time: each download and sleep is capped to the time
+# left, and the wait stops once it is spent. A `pnpm view` lookup cannot be
+# capped (pnpm's `view` takes no fetch-timeout option) and is bounded by pnpm's
+# own fetch timeouts; the deadline is checked right after it. On failure,
 # `version_failure` states the last unmet condition.
 verify_version() {
   local spec="$1" reg="$2" cfg="$3"
-  local attempts delay attempt=1 out code tarball status
+  local attempts delay attempt=1 out code tarball answer deadline remaining pause
   read -r attempts delay < <(poll_plan "${VERSION_VERIFY_ATTEMPTS:-}" "${VERSION_VERIFY_DELAY_SECONDS:-}")
+  deadline=$(( $(date +%s) + VISIBILITY_TIMEOUT_MINUTES * 60 ))
 
   while [ "$attempt" -le "$attempts" ]; do
     tarball=""
     out=$( cd "$RUNNER_TEMP" && NPM_CONFIG_USERCONFIG="$cfg" pnpm view "$spec" dist.tarball --registry="$reg" 2>&1 ); code=$?
     [ "$code" = "0" ] && tarball=$(printf '%s\n' "$out" | grep -m1 -E '^https?://')
     if [ -n "$tarball" ]; then
-      status=$(tarball_status "$tarball")
-      if [ "$status" = "200" ]; then
+      remaining=$(( deadline - $(date +%s) ))
+      [ "$remaining" -le 60 ] || remaining=60
+      [ "$remaining" -ge 1 ] || remaining=1
+      if answer=$(fetch_tarball "$tarball" "$remaining"); then
         [ "$attempt" -eq 1 ] || echo "$spec is installable from $reg after $attempt attempts"
         return 0
       fi
-      out="tarball $tarball answered HTTP $status"
+      out="tarball $tarball $answer"
     fi
-    if [ "$attempt" -lt "$attempts" ]; then
-      echo "waiting for $spec on $reg (attempt $attempt/$attempts, next in ${delay}s, bound ${VISIBILITY_TIMEOUT_MINUTES}m): $(compact "$out" | cut -c1-160)"
-      sleep "$delay"
+    remaining=$(( deadline - $(date +%s) ))
+    if [ "$attempt" -ge "$attempts" ] || [ "$remaining" -le 0 ]; then
+      break
     fi
+    pause=$(( delay < remaining ? delay : remaining ))
+    echo "waiting for $spec on $reg (attempt $attempt/$attempts, next in ${pause}s, bound ${VISIBILITY_TIMEOUT_MINUTES}m): $(compact "$out" | cut -c1-160)"
+    sleep "$pause"
     attempt=$((attempt + 1))
   done
 
   if [ -n "$tarball" ]; then
-    version_failure="npm tarball for $spec is not installable after ${VISIBILITY_TIMEOUT_MINUTES} minutes: $tarball last answered HTTP $status."
+    version_failure="npm tarball for $spec is not installable after ${VISIBILITY_TIMEOUT_MINUTES} minutes: $tarball last $answer."
   else
     version_failure="npm immutable version $spec is not registry-visible after ${VISIBILITY_TIMEOUT_MINUTES} minutes."
   fi
