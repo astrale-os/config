@@ -112,11 +112,13 @@ const pnpmStub = [
   'if [ "${1:-}" = view ]; then',
   '  printf "pnpm %s\\n" "$*" >> "$FAKE_LOOKUP_LOG"',
   '  spec="${2:-}"',
-  '  case ",${FAKE_EXISTING:-}," in',
-  '    *",$spec,"*) printf "%s\\n" "${spec##*@}"; exit 0 ;;',
-  '  esac',
   '  name="${spec%@*}"',
   '  slug="${name##*/}"',
+  '  answer="${spec##*@}"',
+  '  [ "${3:-}" != dist.tarball ] || answer="https://registry.npmjs.org/$name/-/$slug-${spec##*@}.tgz"',
+  '  case ",${FAKE_EXISTING:-}," in',
+  '    *",$spec,"*) printf "%s\\n" "$answer"; exit 0 ;;',
+  '  esac',
   '  marker="$FAKE_PUBLISHED_DIR/$slug.npm"',
   '  if [ -f "$marker" ]; then',
   '    count=0',
@@ -125,7 +127,7 @@ const pnpmStub = [
   '    count=$((count + 1))',
   '    printf "%s\\n" "$count" > "$counter"',
   '    if [ "$count" -gt "${FAKE_VERSION_DELAY_CALLS:-0}" ]; then',
-  '      printf "%s\\n" "${spec##*@}"',
+  '      printf "%s\\n" "$answer"',
   '      exit 0',
   '    fi',
   '  fi',
@@ -146,7 +148,53 @@ const pnpmStub = [
   '',
 ].join('\n')
 
-const sleepStub = ['#!/usr/bin/env bash', 'printf "%s\\n" "$1" >> "$FAKE_SLEEP_LOG"', ''].join('\n')
+// Tarball downloads fail as FAKE_TARBALL_FAILURE says (an HTTP 404, an HTTP 200 whose
+// transfer is truncated, or a stalled transfer that spends its whole --max-time on the
+// fake clock) until FAKE_TARBALL_DELAY_CALLS downloads have run.
+const curlStub = [
+  '#!/usr/bin/env bash',
+  'set -eu',
+  'max_time=""',
+  'while [ "$#" -gt 1 ]; do',
+  '  [ "$1" != --max-time ] || max_time="$2"',
+  '  shift',
+  'done',
+  'printf "%s\\n" "$1" >> "$FAKE_TARBALL_LOG"',
+  'printf "%s\\n" "$max_time" >> "$FAKE_MAX_TIME_LOG"',
+  'count=0',
+  '[ ! -f "$FAKE_TARBALL_COUNTER" ] || read -r count < "$FAKE_TARBALL_COUNTER"',
+  'count=$((count + 1))',
+  'printf "%s\\n" "$count" > "$FAKE_TARBALL_COUNTER"',
+  'if [ "$count" -gt "${FAKE_TARBALL_DELAY_CALLS:-0}" ]; then printf 200; exit 0; fi',
+  'case "${FAKE_TARBALL_FAILURE:-404}" in',
+  '  404) printf 404 ;;',
+  '  truncated) printf 200; exit 18 ;;',
+  '  stalled)',
+  '    read -r now < "$FAKE_CLOCK"',
+  '    printf "%s\\n" "$((now + max_time))" > "$FAKE_CLOCK"',
+  '    printf 000',
+  '    exit 28',
+  '    ;;',
+  'esac',
+  '',
+].join('\n')
+
+// A fake clock: `date +%s` reads it and every sleep advances it.
+const clockStart = 1_000_000
+const dateStub = [
+  '#!/usr/bin/env bash',
+  '[ "${1:-}" = +%s ] || { echo "unexpected date command: $*" >&2; exit 9; }',
+  'cat "$FAKE_CLOCK"',
+  '',
+].join('\n')
+
+const sleepStub = [
+  '#!/usr/bin/env bash',
+  'printf "%s\\n" "$1" >> "$FAKE_SLEEP_LOG"',
+  'read -r now < "$FAKE_CLOCK"',
+  'printf "%s\\n" "$((now + $1))" > "$FAKE_CLOCK"',
+  '',
+].join('\n')
 
 async function readLines(path) {
   try {
@@ -164,6 +212,9 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
   const publishLog = join(root, 'publish.log')
   const lookupLog = join(root, 'lookup.log')
   const sleepLog = join(root, 'sleep.log')
+  const tarballLog = join(root, 'tarball.log')
+  const maxTimeLog = join(root, 'max-time.log')
+  const clock = join(root, 'clock')
 
   try {
     await Promise.all([mkdir(fakeBin), mkdir(runnerTemp), mkdir(join(root, 'published'))])
@@ -177,8 +228,13 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
       writeFile(join(fakeBin, 'npm'), npmStub),
       writeFile(join(fakeBin, 'pnpm'), pnpmStub),
       writeFile(join(fakeBin, 'sleep'), sleepStub),
+      writeFile(join(fakeBin, 'curl'), curlStub),
+      writeFile(join(fakeBin, 'date'), dateStub),
+      writeFile(clock, `${clockStart}\n`),
     ])
-    await Promise.all(['npm', 'pnpm', 'sleep'].map((bin) => chmod(join(fakeBin, bin), 0o755)))
+    await Promise.all(
+      ['npm', 'pnpm', 'sleep', 'curl', 'date'].map((bin) => chmod(join(fakeBin, bin), 0o755)),
+    )
 
     const fakeTags = dirs
       .map((dir) => {
@@ -221,6 +277,10 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
         FAKE_SLEEP_LOG: sleepLog,
         FAKE_PUBLISHED_DIR: join(root, 'published'),
         FAKE_TAG_COUNTER: join(root, 'tag-counter'),
+        FAKE_TARBALL_LOG: tarballLog,
+        FAKE_TARBALL_COUNTER: join(root, 'tarball-counter'),
+        FAKE_MAX_TIME_LOG: maxTimeLog,
+        FAKE_CLOCK: clock,
         FAKE_TAGS: fakeTags,
         VERSION_VERIFY_ATTEMPTS: '1',
         VERSION_VERIFY_DELAY_SECONDS: '0',
@@ -231,11 +291,20 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
       },
     })
 
-    const [calls, lookups, sleeps] = await Promise.all(
-      [publishLog, lookupLog, sleepLog].map(readLines),
+    const [calls, lookups, sleeps, downloads, maxTimes, [now]] = await Promise.all(
+      [publishLog, lookupLog, sleepLog, tarballLog, maxTimeLog, clock].map(readLines),
     )
 
-    return { ...result, calls, lookups, sleeps, output: `${result.stdout}${result.stderr}` }
+    return {
+      ...result,
+      calls,
+      lookups,
+      sleeps,
+      downloads,
+      maxTimes,
+      elapsed: Number(now) - clockStart,
+      output: `${result.stdout}${result.stderr}`,
+    }
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -344,7 +413,7 @@ test('waits for an acknowledged immutable version to become registry-visible', a
   )
   assert.match(
     result.output,
-    /producer@1\.0\.0 is visible on https:\/\/registry\.npmjs\.org after 5 attempts/u,
+    /producer@1\.0\.0 is installable from https:\/\/registry\.npmjs\.org after 5 attempts/u,
   )
   assert.ok(
     result.output.indexOf('after 5 attempts') < result.output.indexOf('publish package: consumer'),
@@ -360,8 +429,117 @@ test('checks visibility with an exact-version pnpm lookup on the publish registr
 
   assert.equal(result.status, 0, result.output)
   assert.deepEqual(result.lookups, [
-    'pnpm view producer@1.0.0 version --registry=https://registry.npmjs.org',
+    'pnpm view producer@1.0.0 dist.tarball --registry=https://registry.npmjs.org',
   ])
+  assert.deepEqual(result.downloads, ['https://registry.npmjs.org/producer/-/producer-1.0.0.tgz'])
+})
+
+test('waits for a visible version whose tarball is not served yet', async () => {
+  const result = await runPublisher({
+    manifests: npmPackages,
+    dirs: ['producer', 'consumer'],
+    extraEnv: {
+      VERSION_VERIFY_ATTEMPTS: '4',
+      VERSION_VERIFY_DELAY_SECONDS: '0',
+      FAKE_TARBALL_DELAY_CALLS: '2',
+    },
+  })
+
+  assert.equal(result.status, 0, result.output)
+  assert.equal(result.calls.length, 2)
+  assert.deepEqual(result.downloads, [
+    'https://registry.npmjs.org/producer/-/producer-1.0.0.tgz',
+    'https://registry.npmjs.org/producer/-/producer-1.0.0.tgz',
+    'https://registry.npmjs.org/producer/-/producer-1.0.0.tgz',
+    'https://registry.npmjs.org/consumer/-/consumer-1.0.0.tgz',
+  ])
+  assert.match(
+    result.output,
+    /waiting for producer@1\.0\.0 on https:\/\/registry\.npmjs\.org \(attempt 2\/4, [^)]*\): tarball https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz answered HTTP 404/u,
+  )
+  assert.ok(
+    result.output.indexOf('installable from https://registry.npmjs.org after 3 attempts') <
+      result.output.indexOf('publish package: consumer'),
+    'the consumer must start only after its producer tarball is served',
+  )
+})
+
+test('fails closed within the bound when a visible version tarball is never served', async () => {
+  const result = await runPublisher({
+    manifests: npmPackages,
+    dirs: ['producer', 'consumer'],
+    extraEnv: {
+      REGISTRY_VISIBILITY_TIMEOUT_MINUTES: '2',
+      VERSION_VERIFY_ATTEMPTS: '',
+      VERSION_VERIFY_DELAY_SECONDS: '',
+      FAKE_TARBALL_DELAY_CALLS: '1000',
+    },
+  })
+
+  // The tarball shares the version's bound: an immediate attempt plus 12 more.
+  assert.equal(result.status, 1)
+  assert.equal(result.calls.length, 1)
+  assert.equal(result.downloads.length, 13)
+  assert.deepEqual(result.sleeps, Array(12).fill('10'))
+  assert.equal(result.elapsed, 120)
+  assert.match(
+    result.output,
+    /npm tarball for producer@1\.0\.0 is not installable after 2 minutes: https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz last answered HTTP 404\. Re-run the failed job to resume/u,
+  )
+  assert.doesNotMatch(result.output, /publish package: consumer/)
+})
+
+test('keeps waiting when a tarball answers HTTP 200 but its download fails', async () => {
+  const result = await runPublisher({
+    manifests: npmPackages,
+    dirs: ['producer', 'consumer'],
+    extraEnv: {
+      VERSION_VERIFY_ATTEMPTS: '4',
+      VERSION_VERIFY_DELAY_SECONDS: '0',
+      FAKE_TARBALL_DELAY_CALLS: '2',
+      FAKE_TARBALL_FAILURE: 'truncated',
+    },
+  })
+
+  assert.equal(result.status, 0, result.output)
+  assert.equal(result.calls.length, 2)
+  assert.equal(result.downloads.length, 4)
+  assert.match(
+    result.output,
+    /\(attempt 2\/4, [^)]*\): tarball https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz answered HTTP 200 but the download failed \(curl exit 18\)/u,
+  )
+  assert.ok(
+    result.output.indexOf('installable from https://registry.npmjs.org after 3 attempts') <
+      result.output.indexOf('publish package: consumer'),
+    'the consumer must start only after its producer tarball downloads completely',
+  )
+})
+
+test('bounds the wait by elapsed time when tarball downloads stall', async () => {
+  const result = await runPublisher({
+    manifests: npmPackages,
+    dirs: ['producer', 'consumer'],
+    extraEnv: {
+      REGISTRY_VISIBILITY_TIMEOUT_MINUTES: '2',
+      VERSION_VERIFY_ATTEMPTS: '',
+      VERSION_VERIFY_DELAY_SECONDS: '',
+      FAKE_TARBALL_DELAY_CALLS: '1000',
+      FAKE_TARBALL_FAILURE: 'stalled',
+    },
+  })
+
+  // Each stalled download spends its whole --max-time, so the 2-minute deadline ends
+  // the wait long before the 13-attempt limit: 60 s, a 10 s pause, then the last 50 s.
+  assert.equal(result.status, 1)
+  assert.equal(result.calls.length, 1)
+  assert.deepEqual(result.maxTimes, ['60', '50'])
+  assert.deepEqual(result.sleeps, ['10'])
+  assert.equal(result.elapsed, 120)
+  assert.match(
+    result.output,
+    /npm tarball for producer@1\.0\.0 is not installable after 2 minutes: https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz last gave no HTTP response \(curl exit 28\)\. Re-run the failed job to resume/u,
+  )
+  assert.doesNotMatch(result.output, /publish package: consumer/)
 })
 
 test('fails closed before a consumer when a version never becomes visible', async () => {

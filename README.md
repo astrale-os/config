@@ -184,8 +184,9 @@ jobs:
 Build and publish a repository's packages in strict producer-before-consumer order: public
 packages to npm through OIDC Trusted Publishing (no token fallback), `@astrale-os/*` packages to
 GitHub Packages. After each publish the action polls until the exact immutable version resolves
-through `pnpm view <name>@<version>` and the release-channel dist-tag points to it, and only then
-starts the next package. A check that is still failing at the bound stops the job.
+through `pnpm view <name>@<version>`, its npm `dist.tarball` answers HTTP 200, and the
+release-channel dist-tag points to it, and only then starts the next package. A check that is still
+failing at the bound stops the job.
 
 A failed job can be re-run safely: versions already published on a registry are skipped (after
 their visibility and dist-tag are verified again) and publication resumes with the first
