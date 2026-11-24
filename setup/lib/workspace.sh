@@ -63,6 +63,54 @@ workspace_missing_paths() {
 # A partial Workspace prepares tools but no product dependencies or artifacts.
 workspace_partial() { [[ -n "$(workspace_missing_paths)" ]]; }
 
+workspace_recorded_pin() {
+  local path="$1" entry
+  entry="$(git -C "$AGENT_REPO_ROOT" ls-tree --format='%(objectmode) %(objectname)' HEAD -- "$path")"
+  [[ "$entry" =~ ^160000[[:space:]]([0-9a-f]{40}|[0-9a-f]{64})$ ]] ||
+    agent_die "Missing recorded submodule commit in HEAD: $path"
+  printf '%s\n' "${BASH_REMATCH[1]}"
+}
+
+workspace_assert_pin() {
+  local path="$1" expected="$2" directory="$AGENT_REPO_ROOT/$1" actual
+  [[ -e "$directory/.git" ]] || agent_die "Missing pinned submodule: $path"
+  actual="$(git -C "$directory" rev-parse --verify HEAD)"
+  [[ "$actual" == "$expected" ]] ||
+    agent_die "$path is at $actual, expected $expected; choose the recorded commit before running pinned setup"
+  [[ ! -f "$directory/.gitmodules" ]] || agent_die "$path gained nested submodules; review their setup policy"
+}
+
+workspace_verify_pins() {
+  local path expected
+  for path in $(workspace_paths); do
+    expected="$(workspace_recorded_pin "$path")"
+    workspace_assert_pin "$path" "$expected"
+  done
+}
+
+workspace_init_pinned() {
+  workspace_preflight
+  git -C "$AGENT_REPO_ROOT" diff --quiet HEAD -- .gitmodules &&
+    git -C "$AGENT_REPO_ROOT" diff --cached --quiet HEAD -- .gitmodules ||
+    agent_die "Pinned setup requires the recorded .gitmodules"
+  local path expected
+  local -a missing=()
+  for path in $(workspace_paths); do
+    expected="$(workspace_recorded_pin "$path")"
+    git -C "$AGENT_REPO_ROOT" diff --cached --quiet HEAD -- "$path" ||
+      agent_die "Pinned setup requires the recorded submodule commit for $path; its index entry changed"
+    if [[ -e "$AGENT_REPO_ROOT/$path/.git" ]]; then
+      workspace_assert_pin "$path" "$expected"
+    else
+      missing+=("$path")
+    fi
+  done
+  if [[ "${#missing[@]}" != 0 ]]; then
+    GIT_TERMINAL_PROMPT=0 git -C "$AGENT_REPO_ROOT" submodule update --init --checkout -- "${missing[@]}"
+  fi
+  workspace_verify_pins
+}
+
 workspace_update_main() {
   workspace_preflight
   local path directory target current paths

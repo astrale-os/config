@@ -62,6 +62,9 @@ test('bootstrap downloads once, uses explicit repo path and verifies cached byte
       ),
   )
   assert.equal(fs.readFileSync(f.env.RESULT, 'utf8'), `${f.repo}\nprepare\n`)
+  result = f.run('codex')
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(fs.readFileSync(f.env.RESULT, 'utf8'), `${f.repo}\ncodex\n`)
   result = f.run('verify')
   assert.equal(result.status, 0, result.stderr)
   assert.equal(fs.readFileSync(f.env.CALLS, 'utf8'), 'download\n')

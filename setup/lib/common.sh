@@ -36,14 +36,14 @@ agent_setup_fingerprint() {
     cd "$AGENT_REPO_ROOT"
     cat "$AGENT_SETUP_DIR/package.json"
     if declare -F repo_fingerprint >/dev/null; then repo_fingerprint; fi
-    printf '\0%s\0%s\0' "$AGENT_SETUP_BROWSER" "$AGENT_SETUP_ASTRALE_CLI"
+    printf '\0%s\0%s\0%s\0' "$AGENT_SETUP_BROWSER" "$AGENT_SETUP_ASTRALE_CLI" "${AGENT_SETUP_CHECKOUT:-pinned}"
     git ls-files --cached --others --exclude-standard -z -- \
       'scripts/setup/**' 'package.json' '**/package.json' \
       'pnpm-lock.yaml' '**/pnpm-lock.yaml' 'pnpm-workspace.yaml' '**/pnpm-workspace.yaml' \
       '.npmrc' '**/.npmrc' '.pnpmfile.cjs' '**/.pnpmfile.cjs' \
       '.nvmrc' '.node-version' '.bun-version' '**/.bun-version' \
       'bun.lock' '**/bun.lock' 'bun.lockb' '**/bun.lockb' \
-      'patches/**' '**/patches/**' '.claude/settings.json' |
+      'patches/**' '**/patches/**' '.gitmodules' '.claude/settings.json' |
       while IFS= read -r -d '' file; do
         printf '%s\0' "$file"
         if [[ -f "$file" ]]; then cat "$file"; else printf 'missing'; fi
@@ -58,6 +58,11 @@ agent_load_config() {
   [[ -f "$configuration" ]] || agent_die "Missing repository configuration: $configuration"
   # shellcheck source=/dev/null
   source "$configuration"
+  export AGENT_SETUP_CHECKOUT="${AGENT_SETUP_CHECKOUT:-pinned}"
+  case "$AGENT_SETUP_CHECKOUT" in
+    pinned|live) ;;
+    *) agent_die "AGENT_SETUP_CHECKOUT must be pinned or live (got: $AGENT_SETUP_CHECKOUT)" ;;
+  esac
   for name in AGENT_SETUP_BROWSER AGENT_SETUP_ASTRALE_CLI; do
     case "${!name:-}" in
       0|1) export "${name?}" ;;
@@ -406,6 +411,13 @@ agent_persist_environment() {
   agent_log "Shell environment: $AGENT_ENV_FILE"
 }
 
+agent_lockfile_option() {
+  case "${AGENT_SETUP_CHECKOUT:-pinned}" in
+    pinned) printf '%s\n' --frozen-lockfile ;;
+    live) printf '%s\n' --no-frozen-lockfile ;;
+  esac
+}
+
 agent_install_repo() {
   cd "$AGENT_REPO_ROOT"
   local before_head before_branch before_lock=missing after_lock=missing result=0
@@ -414,11 +426,12 @@ agent_install_repo() {
   if [[ -f pnpm-lock.yaml ]]; then before_lock="$(git hash-object pnpm-lock.yaml)"; fi
   agent_ensure_pnpm
   # One install at this standalone workspace root. pnpm owns allowed native builds and prepare hooks.
-  STANDALONE=true pnpm install --no-frozen-lockfile --prefer-offline || result=$?
+  STANDALONE=true pnpm install "$(agent_lockfile_option)" --prefer-offline || result=$?
   [[ "$(git rev-parse HEAD)" == "$before_head" ]] || agent_die "HEAD changed during dependency installation"
   [[ "$(git symbolic-ref -q HEAD || true)" == "$before_branch" ]] || agent_die "Branch changed during dependency installation"
   if [[ -f pnpm-lock.yaml ]]; then after_lock="$(git hash-object pnpm-lock.yaml)"; fi
   if [[ "$before_lock" != "$after_lock" ]]; then
+    [[ "$AGENT_SETUP_CHECKOUT" == live ]] || agent_die "pnpm-lock.yaml changed during pinned setup"
     agent_log 'pnpm-lock.yaml changed during setup; review it before committing (setup does not commit)'
   fi
   [[ "$result" == 0 ]] || agent_die "Dependency installation failed in $AGENT_REPO_ROOT (exit $result)"

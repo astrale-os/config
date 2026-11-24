@@ -10,7 +10,7 @@ version="$(node -p 'require(process.argv[1]).version' "$root/package.json")"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 mkdir "$stage/package"
-for entry in run.sh lib profiles setup_runtimes.sh setup_browser_tools.sh setup_skills.sh bootstrap README.md package.json; do
+for entry in astrale-setup run.sh lib profiles setup_runtimes.sh setup_browser_tools.sh setup_skills.sh bootstrap README.md package.json; do
   cp -R "$root/$entry" "$stage/package/"
 done
 name="astrale-setup-$version.tar.gz"

@@ -35,7 +35,9 @@ test('release archive contains runnable entrypoints and its digest matches the d
   ]) {
     assert.equal(spawnSync('bash', ['-n', path.join(unpacked, entry)]).status, 0, entry)
   }
-  const result = spawnSync('bash', [path.join(unpacked, 'run.sh')], { encoding: 'utf8' })
+  const executable = path.join(unpacked, 'astrale-setup')
+  fs.accessSync(executable, fs.constants.X_OK)
+  const result = spawnSync(executable, [], { encoding: 'utf8' })
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /Usage: run.sh REPOSITORY/)
 })

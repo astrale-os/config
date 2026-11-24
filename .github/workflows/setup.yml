@@ -21,9 +21,16 @@ jobs:
           find setup -name '*.sh' -exec bash -n {} \;
           node --test setup/tests/*.test.cjs
           bash setup/pack.sh "$RUNNER_TEMP/setup-release"
-      - name: Prepare Config from its pinned release and verify reuse
+      - name: Prepare Config with the candidate archive and verify reuse
         run: |
-          AGENT_HARNESSES=codex bash scripts/setup/setup.sh
-          AGENT_HARNESSES=codex bash scripts/setup/verify.sh
-          AGENT_HARNESSES=codex bash scripts/setup/setup.sh
-          git diff --exit-code -- pnpm-lock.yaml
+          candidate="$RUNNER_TEMP/setup-candidate"
+          version="$(node -p 'require("./setup/package.json").version')"
+          mkdir -p "$candidate"
+          tar -xzf "$RUNNER_TEMP/setup-release/astrale-setup-$version.tar.gz" -C "$candidate"
+          setup="$candidate/package/astrale-setup"
+          "$setup" "$PWD" codex
+          "$setup" "$PWD" verify
+          "$setup" "$PWD" codex
+          CLAUDE_CODE_REMOTE=true CLAUDE_ENV_FILE="$RUNNER_TEMP/astrale-claude-env" "$setup" "$PWD" claude
+          CLAUDE_CODE_REMOTE=true CLAUDE_ENV_FILE="$RUNNER_TEMP/astrale-claude-env" "$setup" "$PWD" claude
+          git diff --exit-code HEAD -- pnpm-lock.yaml

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-export AGENT_REPO_ROOT="${1:?Usage: run.sh REPOSITORY [prepare|verify|artifacts|claude]}"
+export AGENT_REPO_ROOT="${1:?Usage: run.sh REPOSITORY [prepare|verify|artifacts|codex|claude]}"
 action="${2:-prepare}"
+if [[ "$action" == codex ]]; then export AGENT_HARNESSES=codex; fi
 PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$PACKAGE_DIR/lib/common.sh"
 agent_load_config
@@ -28,7 +29,7 @@ agent_prepare() {
 }
 cd "$AGENT_REPO_ROOT"
 case "$action" in
-  prepare) agent_prepare ;;
+  prepare|codex) agent_prepare ;;
   verify) agent_verify ;;
   artifacts) repo_preflight; repo_prepare ;;
   claude) source "$PACKAGE_DIR/lib/claude.sh"; agent_claude ;;

@@ -311,6 +311,7 @@ test('complete Workspace validates Kernel ownership before runtimes while partia
     integratedFixture(f) +
     noRuntimes +
     [
+      'AGENT_SETUP_CHECKOUT=live',
       'workspace_update_main() { :; }',
       'workspace_check_manifests() { :; }',
       'workspace_missing_paths() { printf "prototype\\n"; }',

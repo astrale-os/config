@@ -61,7 +61,7 @@ function fixture(t) {
   git(upstream, 'commit', '-am', 'latest')
   return { root, upstream, pinned, latest: git(upstream, 'rev-parse', 'HEAD') }
 }
-function setup(root) {
+function setup(root, checkout = 'workspace_update_main') {
   // Only the common logging/root check are replaced; exercise real Git policy
   // against local remotes with deliberately stale workspace gitlinks.
   return run(
@@ -71,13 +71,46 @@ function setup(root) {
       '-euo',
       'pipefail',
       '-c',
-      'agent_check_repo() { :; }; agent_die() { echo "$*" >&2; exit 1; }; agent_log() { :; }; source "$1"; workspace_update_main',
+      'agent_check_repo() { :; }; agent_die() { echo "$*" >&2; exit 1; }; agent_log() { :; }; source "$1"; "$2"',
       'test',
       library,
+      checkout,
     ],
     { AGENT_REPO_ROOT: root },
   )
 }
+test('pinned preparation initializes a fresh clone and reuses the recorded commits', (t) => {
+  const f = fixture(t)
+  const fresh = path.join(path.dirname(f.root), 'fresh workspace')
+  git(f.root, 'clone', f.root, fresh)
+  for (let iteration = 0; iteration < 2; iteration++) {
+    const result = setup(fresh, 'workspace_init_pinned')
+    assert.equal(result.status, 0, result.stderr)
+    for (const repo of repos) {
+      assert.equal(git(path.join(fresh, repo), 'rev-parse', 'HEAD'), f.pinned)
+    }
+    assert.equal(git(fresh, 'status', '--porcelain'), '')
+  }
+})
+
+test('pinned preparation refuses changed child commits before initializing other children', (t) => {
+  const f = fixture(t)
+  const child = path.join(f.root, 'ui')
+  git(f.root, 'submodule', 'deinit', '--force', '--', 'admin')
+  git(child, 'fetch', 'origin', 'main')
+  git(child, 'switch', '-c', 'feature', 'FETCH_HEAD')
+  const unstaged = setup(f.root, 'workspace_init_pinned')
+  assert.notEqual(unstaged.status, 0)
+  assert.match(unstaged.stderr, /ui is at .* expected .* recorded commit/)
+  git(f.root, 'add', 'ui')
+  const staged = setup(f.root, 'workspace_init_pinned')
+  assert.notEqual(staged.status, 0)
+  assert.match(staged.stderr, /recorded submodule commit for ui; its index entry changed/)
+  assert.equal(git(child, 'rev-parse', 'HEAD'), f.latest)
+  assert.equal(git(child, 'branch', '--show-current'), 'feature')
+  assert.equal(fs.existsSync(path.join(f.root, 'admin', '.git')), false)
+})
+
 test('initial checkout and repeated refresh follow remote main, never gitlink pins', (t) => {
   const f = fixture(t)
   git(f.root, 'submodule', 'deinit', '-f', '--all')
