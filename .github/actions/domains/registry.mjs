@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { awaitVisibleVersion } from '../registry-visibility.mjs'
 import { CONSUMER_PROBE, writeDomainConsumer } from './consumer.mjs'
 import { discoverDomains } from './discovery.mjs'
 
@@ -14,7 +15,7 @@ export function expectedTag(version) {
   return prerelease || 'latest'
 }
 
-function run(command, args, { cwd, env }) {
+function runCommand(command, args, { cwd, env }) {
   const result = spawnSync(command, args, {
     cwd,
     env: { ...process.env, ...env, CI: '1' },
@@ -25,10 +26,7 @@ function run(command, args, { cwd, env }) {
   return output
 }
 
-export function admitRegistryMetadata({ name, version, versionOutput, tagsOutput }) {
-  if (!versionOutput.split(/\r?\n/u).some((line) => line.trim() === version)) {
-    throw new Error(`Immutable npm version is not visible: ${name}@${version}`)
-  }
+export function admitDistTag({ name, version, tagsOutput }) {
   const tag = expectedTag(version)
   if (!tagsOutput.split(/\r?\n/u).some((line) => line.trim() === `${tag}: ${version}`)) {
     throw new Error(`npm dist-tag ${name}@${tag} does not resolve to ${version}`)
@@ -40,6 +38,9 @@ export async function provePublishedDomains({
   selection = 'changed',
   before = '',
   registry = 'https://registry.npmjs.org',
+  run = runCommand,
+  request,
+  clock,
 } = {}) {
   const plan = await discoverDomains({ root, selection, before })
   const scratch = await mkdtemp(join(tmpdir(), 'published-domains-'))
@@ -54,15 +55,14 @@ export async function provePublishedDomains({
 
   for (const pkg of plan.selected) {
     const spec = `${pkg.name}@${pkg.version}`
-    const versionOutput = run('pnpm', ['view', spec, 'version', `--registry=${registry}`], {
-      cwd: scratch,
-      env,
-    })
+    // The consumer below resolves the version from the registry once, so it starts only
+    // after the version is installable (bounded wait, fails closed).
+    await awaitVisibleVersion({ name: pkg.name, version: pkg.version, registry, request, clock })
     const tagsOutput = run('npm', ['dist-tag', 'ls', pkg.name, `--registry=${registry}`], {
       cwd: scratch,
       env,
     })
-    admitRegistryMetadata({ ...pkg, versionOutput, tagsOutput })
+    admitDistTag({ ...pkg, tagsOutput })
     const consumer = await mkdtemp(join(scratch, 'consumer-'))
     await writeDomainConsumer({
       directory: consumer,

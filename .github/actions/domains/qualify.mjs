@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { awaitVisibleVersion, observeVersion } from '../registry-visibility.mjs'
 import { CONSUMER_PROBE, writeDomainConsumer } from './consumer.mjs'
 import { discoverDomains } from './discovery.mjs'
 import { writeOutput } from './output.mjs'
@@ -50,28 +51,23 @@ function dependencyRanges(manifest, name) {
   )
 }
 
-export function classifyRegistryRead(result, name, version) {
-  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
-  if (result.status === 0) {
-    if (output.split(/\r?\n/u).some((line) => line.trim() === version)) return 'present'
-    throw new Error(
-      `Registry returned an unexpected version for ${name}@${version}: ${output.trim()}`,
-    )
+/**
+ * Registry state of a selected producer version. A version the registry does not list is
+ * qualified from its exact local tarball (`absent`). A listed version is resolved from the
+ * registry, so it is `present` only once it is installable: the lookup waits for that within
+ * the publication bound and fails closed otherwise. A registry that answers neither way leaves
+ * the state unknown, which stops qualification.
+ */
+export async function registryState({ name, version, registry, request, clock }) {
+  const observation = await observeVersion({ name, version, registry, request })
+  if (observation.state === 'absent') return 'absent'
+  if (observation.state === 'pending' && observation.tarball === undefined) {
+    throw new Error(`Registry visibility is unknown for ${name}@${version}: ${observation.reason}`)
   }
-  if (/E404|\b404\b|No match found|not found/iu.test(output)) return 'absent'
-  throw new Error(`Registry visibility is unknown for ${name}@${version}: ${output.trim()}`)
-}
-
-function defaultRegistryLookup({ name, version, registry, cwd, env }) {
-  return classifyRegistryRead(
-    spawnSync('pnpm', ['view', `${name}@${version}`, 'version', `--registry=${registry}`], {
-      cwd,
-      encoding: 'utf8',
-      env: { ...process.env, ...env, CI: '1' },
-    }),
-    name,
-    version,
-  )
+  if (observation.state === 'pending') {
+    await awaitVisibleVersion({ name, version, registry, request, clock })
+  }
+  return 'present'
 }
 
 export async function overrideForDependencies({
@@ -80,8 +76,6 @@ export async function overrideForDependencies({
   tarballsByName,
   registryLookup,
   registry,
-  cwd,
-  env,
 }) {
   const overrides = {}
   for (const producer of allByName.values()) {
@@ -98,8 +92,6 @@ export async function overrideForDependencies({
       name: producer.name,
       version: producer.version,
       registry,
-      cwd,
-      env,
     })
     if (state === 'present') continue
     if (state !== 'absent') throw new Error(`Unknown registry state ${state} for ${producer.name}`)
@@ -161,8 +153,6 @@ async function proveConsumer({
     tarballsByName,
     registryLookup,
     registry,
-    cwd: consumer,
-    env,
   })
   await writeDomainConsumer({
     directory: consumer,
@@ -188,7 +178,7 @@ export async function qualifyDomains({
   before = '',
   outputDirectory,
   registry = 'https://registry.npmjs.org',
-  registryLookup = defaultRegistryLookup,
+  registryLookup = registryState,
 } = {}) {
   const absoluteRoot = resolve(root)
   const plan = await discoverDomains({ root: absoluteRoot, selection, before })
@@ -241,8 +231,6 @@ export async function qualifyDomains({
       tarballsByName,
       registryLookup,
       registry,
-      cwd: project,
-      env,
     })
     const restoreDependencies = await temporaryDependencyTarballs(project, overrides)
     run('pnpm', ['install', '--ignore-scripts', '--no-frozen-lockfile'], {

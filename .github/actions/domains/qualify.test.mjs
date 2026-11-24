@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { classifyRegistryRead, overrideForDependencies, qualifyDomains } from './qualify.mjs'
+import { overrideForDependencies, qualifyDomains, registryState } from './qualify.mjs'
 
 async function domain(root, dir, name, dependencies = {}, additional = {}) {
   const project = join(root, dir)
@@ -229,14 +230,48 @@ await writeFile('lib/index.js', "export { missing } from 'missing-package'\\n")
   )
 })
 
-test('registry reads distinguish absence from uncertainty', () => {
-  assert.equal(
-    classifyRegistryRead({ status: 1, stderr: 'npm error E404' }, 'a', '1.0.0'),
-    'absent',
+test('a listed producer is present only once it is installable', async () => {
+  const bytes = Buffer.from('producer tarball')
+  const integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`
+  const tarball = 'https://registry.example/a/-/a-1.0.0.tgz'
+  const listed = () => Response.json({ versions: { '1.0.0': { dist: { tarball, integrity } } } })
+  const missing = () => new Response(null, { status: 404 })
+  async function lookup(answers) {
+    const requests = []
+    const sleeps = []
+    const state = await registryState({
+      name: 'a',
+      version: '1.0.0',
+      registry: 'https://registry.example',
+      request: async (url) => {
+        requests.push(url)
+        return answers.shift()
+      },
+      clock: {
+        now: () => 0,
+        sleep: async (milliseconds) => sleeps.push(milliseconds),
+        timeout: () => new AbortController().signal,
+      },
+    }).catch((error) => error)
+    return { state, requests: requests.length, sleeps }
+  }
+
+  // An unlisted producer is qualified from its local tarball, without waiting.
+  assert.deepEqual(await lookup([missing()]), { state: 'absent', requests: 1, sleeps: [] })
+  // A registry that answers neither way stops qualification at once.
+  const unknown = await lookup([new Response(null, { status: 503 })])
+  assert.match(
+    unknown.state.message,
+    /^Registry visibility is unknown for a@1\.0\.0: .* HTTP 503$/u,
   )
-  assert.equal(classifyRegistryRead({ status: 0, stdout: '1.0.0\n' }, 'a', '1.0.0'), 'present')
-  assert.throws(
-    () => classifyRegistryRead({ status: 1, stderr: 'ETIMEDOUT' }, 'a', '1.0.0'),
-    /visibility is unknown/u,
+  assert.deepEqual(unknown.sleeps, [])
+  // A listed producer whose tarball is not served yet is waited for.
+  assert.deepEqual(
+    await lookup([listed(), missing(), listed(), missing(), listed(), new Response(bytes)]),
+    { state: 'present', requests: 6, sleeps: [10_000] },
   )
+  // A listed producer whose served bytes differ from dist.integrity fails closed.
+  const corrupt = await lookup([listed(), new Response('other bytes')])
+  assert.match(corrupt.state.message, /hashes to sha512-\S+, but its packument records/u)
+  assert.deepEqual(corrupt.sleeps, [])
 })

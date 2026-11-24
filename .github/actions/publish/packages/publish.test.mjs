@@ -4,7 +4,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const publisher = fileURLToPath(new URL('./publish.sh', import.meta.url))
 const publisherSource = await readFile(publisher, 'utf8')
@@ -109,31 +109,6 @@ const npmStub = [
 const pnpmStub = [
   '#!/usr/bin/env bash',
   'set -eu',
-  'if [ "${1:-}" = view ]; then',
-  '  printf "pnpm %s\\n" "$*" >> "$FAKE_LOOKUP_LOG"',
-  '  spec="${2:-}"',
-  '  name="${spec%@*}"',
-  '  slug="${name##*/}"',
-  '  answer="${spec##*@}"',
-  '  [ "${3:-}" != dist.tarball ] || answer="https://registry.npmjs.org/$name/-/$slug-${spec##*@}.tgz"',
-  '  case ",${FAKE_EXISTING:-}," in',
-  '    *",$spec,"*) printf "%s\\n" "$answer"; exit 0 ;;',
-  '  esac',
-  '  marker="$FAKE_PUBLISHED_DIR/$slug.npm"',
-  '  if [ -f "$marker" ]; then',
-  '    count=0',
-  '    counter="$marker.pnpm-views"',
-  '    [ ! -f "$counter" ] || read -r count < "$counter"',
-  '    count=$((count + 1))',
-  '    printf "%s\\n" "$count" > "$counter"',
-  '    if [ "$count" -gt "${FAKE_VERSION_DELAY_CALLS:-0}" ]; then',
-  '      printf "%s\\n" "$answer"',
-  '      exit 0',
-  '    fi',
-  '  fi',
-  '  echo "pnpm error ERR_PNPM_NO_MATCHING_VERSION" >&2',
-  '  exit 1',
-  'fi',
   'package_dir=""',
   'destination=""',
   'while [ "$#" -gt 0 ]; do',
@@ -148,53 +123,56 @@ const pnpmStub = [
   '',
 ].join('\n')
 
-// Tarball downloads fail as FAKE_TARBALL_FAILURE says (an HTTP 404, an HTTP 200 whose
-// transfer is truncated, or a stalled transfer that spends its whole --max-time on the
-// fake clock) until FAKE_TARBALL_DELAY_CALLS downloads have run.
-const curlStub = [
-  '#!/usr/bin/env bash',
-  'set -eu',
-  'max_time=""',
-  'while [ "$#" -gt 1 ]; do',
-  '  [ "$1" != --max-time ] || max_time="$2"',
-  '  shift',
-  'done',
-  'printf "%s\\n" "$1" >> "$FAKE_TARBALL_LOG"',
-  'printf "%s\\n" "$max_time" >> "$FAKE_MAX_TIME_LOG"',
-  'count=0',
-  '[ ! -f "$FAKE_TARBALL_COUNTER" ] || read -r count < "$FAKE_TARBALL_COUNTER"',
-  'count=$((count + 1))',
-  'printf "%s\\n" "$count" > "$FAKE_TARBALL_COUNTER"',
-  'if [ "$count" -gt "${FAKE_TARBALL_DELAY_CALLS:-0}" ]; then printf 200; exit 0; fi',
-  'case "${FAKE_TARBALL_FAILURE:-404}" in',
-  '  404) printf 404 ;;',
-  '  truncated) printf 200; exit 18 ;;',
-  '  stalled)',
-  '    read -r now < "$FAKE_CLOCK"',
-  '    printf "%s\\n" "$((now + max_time))" > "$FAKE_CLOCK"',
-  '    printf 000',
-  '    exit 28',
-  '    ;;',
-  'esac',
-  '',
-].join('\n')
+// The npm registry as installers read it, loaded into every `node` the publisher starts
+// (NODE_OPTIONS --import) in place of the network. A package's install packument lists its
+// FAKE_VERSIONS version once that version is in FAKE_EXISTING, or once it is published and
+// FAKE_VERSION_DELAY_CALLS lookups have run. Tarballs answer HTTP 404 until
+// FAKE_TARBALL_DELAY_CALLS downloads have run, then serve the bytes the packument's
+// integrity records, or other bytes for the FAKE_TARBALL_CORRUPT spec.
+function fakeNpmRegistry() {
+  const { createHash } = process.getBuiltinModule('node:crypto')
+  const { appendFileSync, existsSync, readFileSync, writeFileSync } =
+    process.getBuiltinModule('node:fs')
+  const env = process.env
+  const versions = JSON.parse(env.FAKE_VERSIONS)
+  const count = (path) => {
+    const next = (existsSync(path) ? Number(readFileSync(path, 'utf8')) : 0) + 1
+    writeFileSync(path, `${next}\n`)
+    return next
+  }
+  const tarballBytes = (spec) => Buffer.from(`tarball of ${spec}`)
 
-// A fake clock: `date +%s` reads it and every sleep advances it.
-const clockStart = 1_000_000
-const dateStub = [
-  '#!/usr/bin/env bash',
-  '[ "${1:-}" = +%s ] || { echo "unexpected date command: $*" >&2; exit 9; }',
-  'cat "$FAKE_CLOCK"',
-  '',
-].join('\n')
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(input)
+    if (url.origin !== 'https://registry.npmjs.org') throw new TypeError(`unexpected fetch ${url}`)
+    const path = decodeURIComponent(url.pathname.slice(1))
+    const separator = path.indexOf('/-/')
+    if (separator >= 0) {
+      const name = path.slice(0, separator)
+      const spec = `${name}@${versions[name]}`
+      appendFileSync(env.FAKE_TARBALL_LOG, `${url.href}\n`)
+      if (count(env.FAKE_TARBALL_COUNTER) <= Number(env.FAKE_TARBALL_DELAY_CALLS || 0)) {
+        return new Response('Not Found', { status: 404 })
+      }
+      const corrupt = spec === env.FAKE_TARBALL_CORRUPT
+      return new Response(corrupt ? Buffer.from('other bytes') : tarballBytes(spec))
+    }
+    appendFileSync(env.FAKE_LOOKUP_LOG, `${url.href} ${new Headers(init.headers).get('accept')}\n`)
+    const version = versions[path]
+    const spec = `${path}@${version}`
+    const slug = path.slice(path.lastIndexOf('/') + 1)
+    const marker = `${env.FAKE_PUBLISHED_DIR}/${slug}.npm`
+    const listed =
+      `,${env.FAKE_EXISTING || ''},`.includes(`,${spec},`) ||
+      (existsSync(marker) && count(`${marker}.lookups`) > Number(env.FAKE_VERSION_DELAY_CALLS || 0))
+    if (!listed) return new Response('Not Found', { status: 404 })
+    const integrity = `sha512-${createHash('sha512').update(tarballBytes(spec)).digest('base64')}`
+    const tarball = `https://registry.npmjs.org/${path}/-/${slug}-${version}.tgz`
+    return Response.json({ name: path, versions: { [version]: { dist: { tarball, integrity } } } })
+  }
+}
 
-const sleepStub = [
-  '#!/usr/bin/env bash',
-  'printf "%s\\n" "$1" >> "$FAKE_SLEEP_LOG"',
-  'read -r now < "$FAKE_CLOCK"',
-  'printf "%s\\n" "$((now + $1))" > "$FAKE_CLOCK"',
-  '',
-].join('\n')
+const registryStub = `(${fakeNpmRegistry})()\n`
 
 async function readLines(path) {
   try {
@@ -211,10 +189,8 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
   const runnerTemp = join(root, 'runner')
   const publishLog = join(root, 'publish.log')
   const lookupLog = join(root, 'lookup.log')
-  const sleepLog = join(root, 'sleep.log')
   const tarballLog = join(root, 'tarball.log')
-  const maxTimeLog = join(root, 'max-time.log')
-  const clock = join(root, 'clock')
+  const registry = join(fakeBin, 'registry.mjs')
 
   try {
     await Promise.all([mkdir(fakeBin), mkdir(runnerTemp), mkdir(join(root, 'published'))])
@@ -227,14 +203,9 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
     await Promise.all([
       writeFile(join(fakeBin, 'npm'), npmStub),
       writeFile(join(fakeBin, 'pnpm'), pnpmStub),
-      writeFile(join(fakeBin, 'sleep'), sleepStub),
-      writeFile(join(fakeBin, 'curl'), curlStub),
-      writeFile(join(fakeBin, 'date'), dateStub),
-      writeFile(clock, `${clockStart}\n`),
+      writeFile(registry, registryStub),
     ])
-    await Promise.all(
-      ['npm', 'pnpm', 'sleep', 'curl', 'date'].map((bin) => chmod(join(fakeBin, bin), 0o755)),
-    )
+    await Promise.all(['npm', 'pnpm'].map((bin) => chmod(join(fakeBin, bin), 0o755)))
 
     const fakeTags = dirs
       .map((dir) => {
@@ -261,7 +232,8 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
       }
     }
 
-    const result = spawnSync('bash', [publisher], {
+    // One stream, as the job log shows it: the visibility helper reports on stderr.
+    const result = spawnSync('bash', ['-c', 'exec bash "$0" 2>&1', publisher], {
       cwd: root,
       encoding: 'utf8',
       env: {
@@ -272,15 +244,16 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
         GH_PACKAGES_TOKEN: '',
         MIRROR_PUBLIC_PACKAGES: 'true',
         NPM_TOKEN: '',
+        NODE_OPTIONS: `--import=${pathToFileURL(registry).href}`,
+        FAKE_VERSIONS: JSON.stringify(
+          Object.fromEntries(Object.values(manifests).map(({ name, version }) => [name, version])),
+        ),
         FAKE_PUBLISH_LOG: publishLog,
         FAKE_LOOKUP_LOG: lookupLog,
-        FAKE_SLEEP_LOG: sleepLog,
         FAKE_PUBLISHED_DIR: join(root, 'published'),
         FAKE_TAG_COUNTER: join(root, 'tag-counter'),
         FAKE_TARBALL_LOG: tarballLog,
         FAKE_TARBALL_COUNTER: join(root, 'tarball-counter'),
-        FAKE_MAX_TIME_LOG: maxTimeLog,
-        FAKE_CLOCK: clock,
         FAKE_TAGS: fakeTags,
         VERSION_VERIFY_ATTEMPTS: '1',
         VERSION_VERIFY_DELAY_SECONDS: '0',
@@ -291,20 +264,11 @@ async function runPublisher({ manifests, dirs, extraEnv = {}, prebuilt = false }
       },
     })
 
-    const [calls, lookups, sleeps, downloads, maxTimes, [now]] = await Promise.all(
-      [publishLog, lookupLog, sleepLog, tarballLog, maxTimeLog, clock].map(readLines),
+    const [calls, lookups, downloads] = await Promise.all(
+      [publishLog, lookupLog, tarballLog].map(readLines),
     )
 
-    return {
-      ...result,
-      calls,
-      lookups,
-      sleeps,
-      downloads,
-      maxTimes,
-      elapsed: Number(now) - clockStart,
-      output: `${result.stdout}${result.stderr}`,
-    }
+    return { ...result, calls, lookups, downloads, output: `${result.stdout}${result.stderr}` }
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -421,17 +385,20 @@ test('waits for an acknowledged immutable version to become registry-visible', a
   )
 })
 
-test('checks visibility with an exact-version pnpm lookup on the publish registry', async () => {
+test('checks visibility through the install packument and tarball on npm', async () => {
   const result = await runPublisher({
-    manifests: { producer: npmPackages.producer },
+    manifests: { producer: { name: '@astrale-os/producer', version: '1.0.0' } },
     dirs: ['producer'],
+    extraEnv: { MIRROR_PUBLIC_PACKAGES: 'false' },
   })
 
   assert.equal(result.status, 0, result.output)
   assert.deepEqual(result.lookups, [
-    'pnpm view producer@1.0.0 dist.tarball --registry=https://registry.npmjs.org',
+    'https://registry.npmjs.org/@astrale-os%2fproducer application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*',
   ])
-  assert.deepEqual(result.downloads, ['https://registry.npmjs.org/producer/-/producer-1.0.0.tgz'])
+  assert.deepEqual(result.downloads, [
+    'https://registry.npmjs.org/@astrale-os/producer/-/producer-1.0.0.tgz',
+  ])
 })
 
 test('waits for a visible version whose tarball is not served yet', async () => {
@@ -464,24 +431,21 @@ test('waits for a visible version whose tarball is not served yet', async () => 
   )
 })
 
-test('fails closed within the bound when a visible version tarball is never served', async () => {
+test('fails closed within the bound when a listed version tarball is never served', async () => {
   const result = await runPublisher({
     manifests: npmPackages,
     dirs: ['producer', 'consumer'],
     extraEnv: {
       REGISTRY_VISIBILITY_TIMEOUT_MINUTES: '2',
-      VERSION_VERIFY_ATTEMPTS: '',
-      VERSION_VERIFY_DELAY_SECONDS: '',
+      VERSION_VERIFY_ATTEMPTS: '3',
+      VERSION_VERIFY_DELAY_SECONDS: '0',
       FAKE_TARBALL_DELAY_CALLS: '1000',
     },
   })
 
-  // The tarball shares the version's bound: an immediate attempt plus 12 more.
   assert.equal(result.status, 1)
   assert.equal(result.calls.length, 1)
-  assert.equal(result.downloads.length, 13)
-  assert.deepEqual(result.sleeps, Array(12).fill('10'))
-  assert.equal(result.elapsed, 120)
+  assert.equal(result.downloads.length, 3)
   assert.match(
     result.output,
     /npm tarball for producer@1\.0\.0 is not installable after 2 minutes: https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz last answered HTTP 404\. Re-run the failed job to resume/u,
@@ -489,55 +453,23 @@ test('fails closed within the bound when a visible version tarball is never serv
   assert.doesNotMatch(result.output, /publish package: consumer/)
 })
 
-test('keeps waiting when a tarball answers HTTP 200 but its download fails', async () => {
+test('stops at once when a served tarball differs from its recorded integrity', async () => {
   const result = await runPublisher({
     manifests: npmPackages,
     dirs: ['producer', 'consumer'],
     extraEnv: {
       VERSION_VERIFY_ATTEMPTS: '4',
       VERSION_VERIFY_DELAY_SECONDS: '0',
-      FAKE_TARBALL_DELAY_CALLS: '2',
-      FAKE_TARBALL_FAILURE: 'truncated',
+      FAKE_TARBALL_CORRUPT: 'producer@1.0.0',
     },
   })
 
-  assert.equal(result.status, 0, result.output)
-  assert.equal(result.calls.length, 2)
-  assert.equal(result.downloads.length, 4)
-  assert.match(
-    result.output,
-    /\(attempt 2\/4, [^)]*\): tarball https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz answered HTTP 200 but the download failed \(curl exit 18\)/u,
-  )
-  assert.ok(
-    result.output.indexOf('installable from https://registry.npmjs.org after 3 attempts') <
-      result.output.indexOf('publish package: consumer'),
-    'the consumer must start only after its producer tarball downloads completely',
-  )
-})
-
-test('bounds the wait by elapsed time when tarball downloads stall', async () => {
-  const result = await runPublisher({
-    manifests: npmPackages,
-    dirs: ['producer', 'consumer'],
-    extraEnv: {
-      REGISTRY_VISIBILITY_TIMEOUT_MINUTES: '2',
-      VERSION_VERIFY_ATTEMPTS: '',
-      VERSION_VERIFY_DELAY_SECONDS: '',
-      FAKE_TARBALL_DELAY_CALLS: '1000',
-      FAKE_TARBALL_FAILURE: 'stalled',
-    },
-  })
-
-  // Each stalled download spends its whole --max-time, so the 2-minute deadline ends
-  // the wait long before the 13-attempt limit: 60 s, a 10 s pause, then the last 50 s.
   assert.equal(result.status, 1)
   assert.equal(result.calls.length, 1)
-  assert.deepEqual(result.maxTimes, ['60', '50'])
-  assert.deepEqual(result.sleeps, ['10'])
-  assert.equal(result.elapsed, 120)
+  assert.equal(result.downloads.length, 1)
   assert.match(
     result.output,
-    /npm tarball for producer@1\.0\.0 is not installable after 2 minutes: https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz last gave no HTTP response \(curl exit 28\)\. Re-run the failed job to resume/u,
+    /Publication stopped::producer@1\.0\.0 tarball https:\/\/registry\.npmjs\.org\/producer\/-\/producer-1\.0\.0\.tgz hashes to sha512-\S+, but its packument records sha512-\S+/u,
   )
   assert.doesNotMatch(result.output, /publish package: consumer/)
 })
@@ -558,32 +490,9 @@ test('fails closed before a consumer when a version never becomes visible', asyn
   assert.equal(result.lookups.length, 3)
   assert.match(
     result.output,
-    /pnpm visibility check for producer@1\.0\.0 on https:\/\/registry\.npmjs\.org returned/u,
-  )
-  assert.match(
-    result.output,
-    /npm immutable version producer@1\.0\.0 is not registry-visible after 15 minutes\. Re-run the failed job to resume/u,
+    /npm immutable version producer@1\.0\.0 is not registry-visible after 15 minutes: packument https:\/\/registry\.npmjs\.org\/producer answered HTTP 404\. Re-run the failed job to resume/u,
   )
   assert.doesNotMatch(result.output, /publish package: consumer/)
-})
-
-test('derives the poll count from the configured visibility bound', async () => {
-  const result = await runPublisher({
-    manifests: { producer: npmPackages.producer },
-    dirs: ['producer'],
-    extraEnv: {
-      REGISTRY_VISIBILITY_TIMEOUT_MINUTES: '2',
-      VERSION_VERIFY_ATTEMPTS: '',
-      VERSION_VERIFY_DELAY_SECONDS: '',
-      FAKE_VERSION_DELAY_CALLS: '1000',
-    },
-  })
-
-  // 2 minutes at the default 10-second interval: an immediate attempt plus 12 more.
-  assert.equal(result.status, 1)
-  assert.equal(result.lookups.length, 13)
-  assert.deepEqual(result.sleeps, Array(12).fill('10'))
-  assert.match(result.output, /not registry-visible after 2 minutes/u)
 })
 
 test('rejects an invalid visibility bound before publishing anything', async () => {

@@ -47,8 +47,10 @@ jobs:
 On a release merge, the workflow selects only manifest versions changed from the preceding commit.
 A manual dispatch selects every current public Domain and safely skips versions already present on
 npm. Publication is producer-first and stops on an unknown registry read or failed package. Success
-requires the immutable version, expected dist-tag, a fresh registry-only resolution with dependency
-lifecycle scripts disabled, and the root import. Repository publication runs queue sequentially so
+requires the immutable version to be installable (npm serves its tarball, whose sha512 matches
+`dist.integrity`), the expected dist-tag, a fresh registry-only resolution with dependency
+lifecycle scripts disabled, and the root import. The fresh resolution starts only once the version
+is installable, within the publication bound. Repository publication runs queue sequentially so
 no version-changing release is dropped and an older run cannot race a newer npm dist-tag.
 
 Each npm package needs its Trusted Publisher configured once before its first release. The workflow
@@ -56,7 +58,8 @@ accepts no npm token and no Domain-specific credentials.
 
 ## Same-release Domain dependencies
 
-Domain-to-Domain dependencies remain normal semver dependencies. If a selected producer version
-is not visible on npm yet, qualification uses that exact producer tarball only in the disposable
-project. The authored manifest and packed consumer dependency remain unchanged. Cycles and ranges
+Domain-to-Domain dependencies remain normal semver dependencies. If npm does not list a selected
+producer version yet, qualification uses that exact producer tarball only in the disposable
+project. A listed producer version is resolved from npm once it is installable, within the
+publication bound. The authored manifest and packed consumer dependency remain unchanged. Cycles and ranges
 that do not admit the selected producer version fail before publication.
