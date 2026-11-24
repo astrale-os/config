@@ -36,7 +36,7 @@ agent_setup_fingerprint() {
     cd "$AGENT_REPO_ROOT"
     cat "$AGENT_SETUP_DIR/package.json"
     if declare -F repo_fingerprint >/dev/null; then repo_fingerprint; fi
-    printf '\0%s\0%s\0%s\0' "$AGENT_SETUP_BROWSER" "$AGENT_SETUP_ASTRALE_CLI" "${AGENT_SETUP_CHECKOUT:-pinned}"
+    printf '\0%s\0%s\0%s\0%s\0' "$AGENT_SETUP_BROWSER" "$AGENT_SETUP_ASTRALE_CLI" "${AGENT_SETUP_ELECTRON:-1}" "${AGENT_SETUP_CHECKOUT:-pinned}"
     git ls-files --cached --others --exclude-standard -z -- \
       'scripts/setup/**' 'package.json' '**/package.json' \
       'pnpm-lock.yaml' '**/pnpm-lock.yaml' 'pnpm-workspace.yaml' '**/pnpm-workspace.yaml' \
@@ -63,7 +63,8 @@ agent_load_config() {
     pinned|live) ;;
     *) agent_die "AGENT_SETUP_CHECKOUT must be pinned or live (got: $AGENT_SETUP_CHECKOUT)" ;;
   esac
-  for name in AGENT_SETUP_BROWSER AGENT_SETUP_ASTRALE_CLI; do
+  export AGENT_SETUP_ELECTRON="${AGENT_SETUP_ELECTRON:-1}"
+  for name in AGENT_SETUP_BROWSER AGENT_SETUP_ASTRALE_CLI AGENT_SETUP_ELECTRON; do
     case "${!name:-}" in
       0|1) export "${name?}" ;;
       *) agent_die "$name must be 0 or 1 (got: ${!name:-unset})" ;;
@@ -390,8 +391,16 @@ agent_persist_environment() {
   } > "$temporary"
   mv "$temporary" "$AGENT_ENV_FILE"
   line="$(agent_environment_reference)"
-  for file in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.zprofile" "$HOME/.zshrc"; do
+  for file in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.bashrc" "$HOME/.zprofile" "$HOME/.zshrc"; do
+    # Keep the existing Bash login chain; a new .bash_profile would shadow .profile.
+    if [[ "$file" == "$HOME/.bash_profile" || "$file" == "$HOME/.bash_login" ]]; then
+      [[ -f "$file" ]] || continue
+    fi
     if ! grep -Fqx "$line" "$file" 2>/dev/null; then
+      # Restricted shells can still load the generated activation file explicitly.
+      if [[ -e "$file" && ! -w "$file" ]] || [[ ! -e "$file" && ! -w "$HOME" ]]; then
+        continue
+      fi
       if [[ "$file" == "$HOME/.bashrc" ]]; then
         # Stock Linux bashrc returns early in non-interactive shells.
         temporary="$(mktemp)"

@@ -56,7 +56,8 @@ hook call the consumer bootstrap with `claude`. The hook uses the same preparati
 Remote hooks lock preparation and rerun when setup inputs change; otherwise they
 load paths and resume required services. Docker restart reuses its installed
 engine without installation or downloads. Failed preparation leaves no success marker.
-Local hooks only load prepared paths. Conductor selects `AGENT_SETUP_TOOLS=check`;
+Local hooks only load prepared paths. If shell profiles are read-only, source the
+generated `env.sh` reported by setup. Conductor selects `AGENT_SETUP_TOOLS=check`;
 this permits archive/dependency downloads but never installs machine tools.
 
 Bootstrap requires Bash, curl, tar/gzip and sha256sum or shasum, not Node/npm.
@@ -65,6 +66,7 @@ and runtime download hosts used by the enabled tools. Only the verified archive 
 cached; each invocation extracts a private copy. Versions never follow `latest` or `main`.
 
 GUI readiness executes Electron's version command and probes three browsers.
+Use `AGENT_SETUP_ELECTRON=0` for a headless setup without Electron.
 Installation can repair a diagnosed missing GTK 3 library through signed APT;
 verification/check mode cannot. Root and GitHub runner probes use `--no-sandbox`;
 ordinary local users retain the sandbox. Application display and end-to-end tests
