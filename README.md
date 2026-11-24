@@ -183,10 +183,13 @@ jobs:
 
 Build and publish a repository's packages in strict producer-before-consumer order: public
 packages to npm through OIDC Trusted Publishing (no token fallback), `@astrale-os/*` packages to
-GitHub Packages. After each publish the action polls until the exact immutable version resolves
-through `pnpm view <name>@<version>`, its npm `dist.tarball` answers HTTP 200, and the
-release-channel dist-tag points to it, and only then starts the next package. A check that is still
-failing at the bound stops the job.
+GitHub Packages. After each publish the action polls until the release-channel dist-tag points to
+the exact immutable version and, on npm, that version is installable: the install packument lists
+it, npm serves its `dist.tarball`, and the served bytes match the sha512 in `dist.integrity`. Only
+then does the next package start. A check that is still failing at the bound stops the job; a
+tarball whose bytes differ from `dist.integrity` stops it at once. The installable definition lives
+in `.github/actions/registry-visibility.mjs`, which the Domains qualifier and registry proof also
+wait on.
 
 A failed job can be re-run safely: versions already published on a registry are skipped (after
 their visibility and dist-tag are verified again) and publication resumes with the first
@@ -202,7 +205,7 @@ unpublished package.
 | `install-command`                     | `STANDALONE=true pnpm install --frozen-lockfile` | Install command                                              |
 | `prerelease-tag`                      | `auto`                                        | npm dist-tag for prereleases                                    |
 | `tarballs-json`                       | `{}`                                          | Prepared directory-to-tarball map                               |
-| `registry-visibility-timeout-minutes` | `15`                                          | Minutes (1-60) to wait for each version and dist-tag to be visible |
+| `registry-visibility-timeout-minutes` | `15`                                          | Minutes (1-60) to wait for each version to be installable and its dist-tag visible |
 
 ### publish/mirror-npm-to-github
 

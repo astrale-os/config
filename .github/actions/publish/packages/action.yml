@@ -37,9 +37,10 @@ inputs:
     default: '{}'
   registry-visibility-timeout-minutes:
     description: >
-      Minutes (1-60) to wait for each published immutable version (with its npm
-      tarball) and dist-tag to become visible on its registry before failing
-      closed. A dependent package never starts before its producer is visible.
+      Minutes (1-60) to wait for each published immutable version to become
+      installable (on npm: its tarball served and matching dist.integrity) and
+      its dist-tag visible on its registry before failing closed. A dependent
+      package never starts before its producer is visible.
       Re-running a failed job resumes: versions already published are skipped.
     default: '15'
 
