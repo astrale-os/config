@@ -40,7 +40,7 @@ export async function observeVersion({
   signal = AbortSignal.timeout(OBSERVATION_LIMIT_MS),
 }) {
   const spec = `${name}@${version}`
-  const packument = `${registry.replace(/\/+$/u, '')}/${name.replace('/', '%2f')}`
+  const packument = `${registry.replace(/\/+$/u, '')}/${name.replaceAll('/', '%2f')}`
   let document
   try {
     const response = await request(packument, { headers: { accept: INSTALL_PACKUMENT }, signal })
