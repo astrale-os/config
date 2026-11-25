@@ -25,7 +25,7 @@ agent_verify() {
     for tool in playwright agent-browser chrome-devtools; do agent_check_browser "$tool"; done
     for harness in ${AGENT_HARNESSES//,/ }; do
       for skill in agent-browser chrome-devtools-cli; do
-        node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$(agent_skill_directory "$harness")/$skill" "$skill"
+        agent_check_skill "$harness" "$skill"
       done
     done
   fi
@@ -34,7 +34,7 @@ agent_verify() {
     local harness skill
     for harness in ${AGENT_HARNESSES//,/ }; do
       for skill in astrale-cli astrale-domain; do
-        node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$(agent_skill_directory "$harness")/$skill" "$skill"
+        agent_check_skill "$harness" "$skill"
       done
     done
   fi

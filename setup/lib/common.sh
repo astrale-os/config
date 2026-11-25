@@ -319,6 +319,7 @@ agent_playwright_module() {
 }
 
 agent_select_browser() {
+  export AGENT_BROWSER_SOCKET_DIR="${AGENT_BROWSER_SOCKET_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/astrale-browser-sockets}"
   export AGENT_PLAYWRIGHT_MODULE
   AGENT_PLAYWRIGHT_MODULE="$(agent_playwright_module)"
   export AGENT_BROWSER_EXECUTABLE_PATH
@@ -344,11 +345,22 @@ agent_skill_directory() {
   esac
 }
 
+agent_check_skill() {
+  local harness="$1" name="$2" project_skills
+  case "$harness" in
+    codex) project_skills="$AGENT_REPO_ROOT/.agents/skills" ;;
+    claude) project_skills="$AGENT_REPO_ROOT/.claude/skills" ;;
+    *) agent_die "Unsupported skills target: $harness" ;;
+  esac
+  node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$project_skills/$name" "$name" ||
+    node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$(agent_skill_directory "$harness")/$name" "$name"
+}
+
 agent_ensure_skill() {
   [[ "$AGENT_SETUP_TOOLS" != check ]] || return 0
   local agent="$1" source="$2" name="$3" destination skills_target
   destination="$(agent_skill_directory "$agent")/$name"
-  if node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$destination" "$name"; then
+  if agent_check_skill "$agent" "$name"; then
     agent_log "Reusing $name skill for $agent"
     return
   fi
@@ -377,7 +389,7 @@ agent_persist_environment() {
     printf 'export AGENT_SETUP_HOME=%q\n' "$AGENT_SETUP_HOME"
     # shellcheck disable=SC2016 # Expand PATH in the future shell, never capture the setup shell.
     printf 'export PATH=%q:%q:"$PATH"\n' "$AGENT_BIN" "$AGENT_TOOLS/bin"
-    if [[ -n "${AGENT_BROWSER_EXECUTABLE_PATH:-}" ]]; then
+    if [[ -n "${AGENT_PLAYWRIGHT_MODULE:-}" && -n "${AGENT_BROWSER_EXECUTABLE_PATH:-}" ]]; then
       if [[ -n "${PLAYWRIGHT_BROWSERS_PATH+x}" ]]; then
         printf 'export PLAYWRIGHT_BROWSERS_PATH=%q\n' "$PLAYWRIGHT_BROWSERS_PATH"
       else
@@ -385,7 +397,10 @@ agent_persist_environment() {
         printf 'unset PLAYWRIGHT_BROWSERS_PATH\n'
       fi
       printf 'export AGENT_BROWSER_EXECUTABLE_PATH=%q\n' "$AGENT_BROWSER_EXECUTABLE_PATH"
-      printf 'export CHROME_DEVTOOLS_EXECUTABLE_PATH=%q\n' "$CHROME_DEVTOOLS_EXECUTABLE_PATH"
+      if [[ -n "${AGENT_BROWSER_SOCKET_DIR:-}" ]]; then
+        printf 'export AGENT_BROWSER_SOCKET_DIR=%q\n' "$AGENT_BROWSER_SOCKET_DIR"
+      fi
+      printf 'export CHROME_DEVTOOLS_EXECUTABLE_PATH=%q\n' "${CHROME_DEVTOOLS_EXECUTABLE_PATH:-$AGENT_BROWSER_EXECUTABLE_PATH}"
       printf 'export AGENT_PLAYWRIGHT_MODULE=%q\n' "$AGENT_PLAYWRIGHT_MODULE"
     fi
   } > "$temporary"

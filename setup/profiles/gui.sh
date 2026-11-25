@@ -4,6 +4,10 @@ repo_preflight() {
   [[ "$AGENT_SETUP_ASTRALE_CLI" == 0 ]] || agent_die 'GUI does not install the Astrale CLI'
 }
 repo_prepare() {
+  if [[ "$AGENT_SETUP_BROWSER" == 1 && "$AGENT_SETUP_TOOLS" != check ]]; then
+    agent_select_browser
+    pnpm --dir desktop exec playwright install chromium
+  fi
   [[ "${AGENT_SETUP_ELECTRON:-1}" == 1 ]] || return 0
   if [[ "$AGENT_SETUP_TOOLS" == check ]]; then
     node "$AGENT_SETUP_DIR/lib/electron.cjs"

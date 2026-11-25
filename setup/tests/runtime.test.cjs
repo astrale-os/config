@@ -80,6 +80,18 @@ test('pinned Bun fails locally instead of downloading another version', (t) => {
   assert.match(result.stderr, /Activate Bun 0.0.1/)
 })
 
+test('runtime activation works before Playwright discovery with a caller browser path', (t) => {
+  const f = fixture(t)
+  f.env.AGENT_SETUP_TOOLS = 'install'
+  f.env.AGENT_BROWSER_EXECUTABLE_PATH = '/usr/bin/chromium'
+  const result = f.shell(
+    'unset AGENT_PLAYWRIGHT_MODULE; agent_persist_environment; cat "$AGENT_ENV_FILE"',
+  )
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /export PATH=/)
+  assert.doesNotMatch(result.stdout, /export AGENT_PLAYWRIGHT_MODULE=/)
+})
+
 test('Claude prepares once, refreshes changed inputs and never caches a failure', (t) => {
   if (spawnSync('sh', ['-c', 'command -v flock']).status !== 0)
     return t.skip('Requires Linux flock')
