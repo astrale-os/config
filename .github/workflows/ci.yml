@@ -36,13 +36,3 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: printf '%s\n' "$PR_TITLE" | pnpm commitlint
-
-  # Example merge-guard job (repos should customize dependencies)
-  # merge-guard:
-  #   runs-on: ubuntu-latest
-  #   if: github.event_name == 'pull_request'
-  #   steps:
-  #     - uses: astrale-os/config/.github/actions/merge-guard@9bffee57d53b603b556bb545145fdde10f20a4c5
-  #       with:
-  #         github-token: ${{ github.token }}
-  #         dependencies: '["kernel"]'

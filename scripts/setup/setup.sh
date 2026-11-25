@@ -4,7 +4,7 @@ set -euo pipefail
 directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 root="$(cd "$directory/../.." && pwd -P)"
 action="${1:-prepare}"
-case "$action" in prepare|verify|artifacts|claude) ;; *) echo 'Unknown setup action' >&2; exit 1;; esac
+case "$action" in prepare|verify|artifacts|codex|claude) ;; *) echo 'Unknown setup action' >&2; exit 1;; esac
 read -r version digest extra < "$directory/setup.lock"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$digest" =~ ^[a-f0-9]{64}$ && -z "${extra:-}" ]] || {
   echo 'Invalid setup.lock: expected exact version and SHA-256' >&2; exit 1;
