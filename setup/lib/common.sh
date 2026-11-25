@@ -413,9 +413,21 @@ agent_persist_environment() {
       printf 'export CHROME_DEVTOOLS_EXECUTABLE_PATH=%q\n' "${CHROME_DEVTOOLS_EXECUTABLE_PATH:-$AGENT_BROWSER_EXECUTABLE_PATH}"
       printf 'export AGENT_PLAYWRIGHT_MODULE=%q\n' "$AGENT_PLAYWRIGHT_MODULE"
     fi
+    if [[ -n "${AGENT_SETUP_CODEX_SCOPE:-}" ]]; then
+      printf 'export AGENT_SETUP_ACTIVE_ENV=%q\n' "$AGENT_ENV_FILE"
+    fi
   } > "$temporary"
   mv "$temporary" "$AGENT_ENV_FILE"
   line="$(agent_environment_reference)"
+  if [[ -n "${AGENT_SETUP_CODEX_SCOPE:-}" ]]; then
+    temporary="$(mktemp "$AGENT_SETUP_HOME/bash-env.XXXXXX")"
+    {
+      # Child shells inherit activation and can keep explicit tool overrides.
+      # shellcheck disable=SC2016
+      printf 'if [[ "${AGENT_SETUP_ACTIVE_ENV:-}" != %q ]]; then\n  %s\nfi\n' "$AGENT_ENV_FILE" "$line"
+    } > "$temporary"
+    mv "$temporary" "$AGENT_SETUP_HOME/bash-env.sh"
+  fi
   for file in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.bashrc" "$HOME/.zprofile" "$HOME/.zshrc"; do
     # Keep the existing Bash login chain; a new .bash_profile would shadow .profile.
     if [[ "$file" == "$HOME/.bash_profile" || "$file" == "$HOME/.bash_login" ]]; then
