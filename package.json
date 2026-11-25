@@ -30,7 +30,7 @@
     "prepare": "husky",
     "setup": "bash scripts/setup/setup.sh",
     "setup:claude": "AGENT_HARNESSES=claude bash scripts/setup/setup.sh",
-    "setup:codex": "AGENT_HARNESSES=codex bash scripts/setup/setup.sh",
+    "setup:codex": "bash scripts/setup/setup.sh codex",
     "setup:local": "AGENT_SETUP_TOOLS=check bash scripts/setup/setup.sh",
     "test:setup": "node --test setup/tests/*.test.cjs",
     "check:setup": "bash scripts/setup/verify.sh"
