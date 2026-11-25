@@ -92,6 +92,67 @@ test('runtime activation works before Playwright discovery with a caller browser
   assert.doesNotMatch(result.stdout, /export AGENT_PLAYWRIGHT_MODULE=/)
 })
 
+test('Codex profile activates a parent directory without shadowing an explicit pnpm override', (t) => {
+  const f = fixture(t)
+  f.env.AGENT_SETUP_TOOLS = 'install'
+  f.env.AGENT_SETUP_CODEX_SCOPE = f.env.HOME
+  f.env.XDG_CACHE_HOME = path.join(f.root, 'cache')
+  const result = f.shell(`
+    agent_persist_environment
+    cd "$AGENT_SETUP_CODEX_SCOPE"
+    unset XDG_CACHE_HOME
+    . "$HOME/.profile"
+    [[ "$XDG_CACHE_HOME" == "$AGENT_REPO_ROOT/cache" ]]
+    export PATH="$AGENT_REPO_ROOT/explicit:$PATH"
+    expected_path="$PATH"
+    . "$HOME/.profile"
+    [[ "$PATH" == "$expected_path" ]]
+  `)
+  assert.equal(result.status, 0, result.stderr)
+})
+
+test('Codex installs the optional Bun and PostgreSQL pins once and keeps the default Bun', (t) => {
+  const f = fixture(t)
+  f.env.AGENT_SETUP_TOOLS = 'install'
+  f.env.AGENT_CODEX_BUN_VERSION = '1.4.5'
+  f.env.AGENT_CODEX_POSTGRES_IMAGE = `postgres@sha256:${'a'.repeat(64)}`
+  const result = f.shell(`
+    source "$PACKAGE_ROOT/lib/codex.sh"
+    export PATH="$AGENT_BIN:/usr/bin:/bin"
+    bun() { echo 1.4.4; }
+    agent_npm_install() {
+      printf '%s\\n' "$2"
+      mkdir -p "$1/bin"
+      printf '#!/bin/sh\\necho 1.4.5\\n' > "$1/bin/bun"
+      chmod +x "$1/bin/bun"
+    }
+    agent_codex_docker() {
+      case "$1" in
+        image) test -f "$AGENT_REPO_ROOT/image" ;;
+        pull) printf '%s\\n' "$2"; touch "$AGENT_REPO_ROOT/image" ;;
+        run) [[ "$*" == *'--pull=never'* && "$*" == *'--network none'* ]] ;;
+      esac
+    }
+    agent_validate_codex_extras
+    agent_prepare_codex_extras
+    agent_prepare_codex_extras
+    bun --version
+    bun-latest --version
+  `)
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout, `bun@1.4.5\n${f.env.AGENT_CODEX_POSTGRES_IMAGE}\n1.4.4\n1.4.5\n`)
+})
+
+test('Codex rejects a floating PostgreSQL tag and a floating Bun version', (t) => {
+  const f = fixture(t)
+  const check = 'source "$PACKAGE_ROOT/lib/codex.sh"; agent_validate_codex_extras'
+  assert.match(f.shell('AGENT_CODEX_BUN_VERSION=latest; ' + check).stderr, /exact Bun version/)
+  assert.match(
+    f.shell('AGENT_CODEX_POSTGRES_IMAGE=postgres:19; ' + check).stderr,
+    /immutable postgres digest/,
+  )
+})
+
 test('Claude prepares once, refreshes changed inputs and never caches a failure', (t) => {
   if (spawnSync('sh', ['-c', 'command -v flock']).status !== 0)
     return t.skip('Requires Linux flock')
