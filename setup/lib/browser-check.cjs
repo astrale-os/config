@@ -38,21 +38,23 @@ async function main() {
     return
   }
   const executable = process.env.AGENT_BROWSER_EXECUTABLE_PATH
-  fs.accessSync(executable, fs.constants.X_OK)
   if (mode === 'playwright') {
-    const browser = await chromium.launch({
-      executablePath: executable,
-      headless: true,
-      timeout: 30_000,
-    })
-    try {
-      const page = await browser.newPage()
-      await page.setContent('<title>Astrale setup</title><button>Ready</button>')
-      if ((await page.title()) !== 'Astrale setup') throw new Error('Playwright page probe failed')
-    } finally {
-      await browser.close()
+    for (const options of [{}, { executablePath: executable }]) {
+      const browser = await chromium.launch({ ...options, headless: true, timeout: 30_000 })
+      try {
+        const page = await browser.newPage()
+        await page.setContent('<title>Astrale setup</title><button>Ready</button>')
+        if ((await page.title()) !== 'Astrale setup')
+          throw new Error('Playwright page probe failed')
+      } finally {
+        await browser.close()
+      }
     }
-  } else if (mode === 'agent-browser') {
+    process.stdout.write('[agent-setup] playwright: default and full Chromium launches verified\n')
+    return
+  }
+  fs.accessSync(executable, fs.constants.X_OK)
+  if (mode === 'agent-browser') {
     const args = ['--session', `astrale-setup-${process.pid}`, '--executable-path', executable]
     try {
       command('agent-browser', [...args, 'open', 'about:blank'])

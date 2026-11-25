@@ -125,7 +125,7 @@ agent_install_browser_dependencies() (
 agent_browser_probe() { agent_check_browser playwright 2>&1 | tee "$1"; }
 
 agent_ensure_browser() {
-  local logs="${1:-}" started=$SECONDS
+  local logs="${1:-}" started=$SECONDS launch_log
   if [[ -z "$logs" ]]; then
     mkdir -p "$AGENT_SETUP_HOME/logs/browser"
     logs="$(mktemp -d "$AGENT_SETUP_HOME/logs/browser/run.XXXXXX")"
@@ -143,28 +143,35 @@ agent_ensure_browser() {
     agent_link "$AGENT_TOOLS/bin/playwright" playwright
   fi
   agent_select_browser
-  if [[ ! -x "$AGENT_BROWSER_EXECUTABLE_PATH" ]]; then
-    agent_log 'Installing the Chromium revision required by Playwright'
-    # Force repairs an incomplete download whose Playwright install marker already exists.
-    playwright install --force --no-shell chromium
+  launch_log="$logs/launch-before.log"
+  if agent_browser_probe "$launch_log"; then
+    agent_log "Browser ready after $((SECONDS - started))s"
+    return
   fi
-  if ! agent_browser_probe "$logs/launch-before.log"; then
-    if ! agent_browser_missing_libraries "$logs/launch-before.log"; then
-      # Common: retain corrupt-download repair, without interpreting sandbox/other errors as
-      # missing Ubuntu packages. A second failed launch must still pass the library check below.
-      agent_log 'Retrying browser launch after repairing the Chromium download'
-      playwright install --force --no-shell chromium
-      agent_select_browser
-      if agent_browser_probe "$logs/launch-repair.log"; then
-        agent_log 'Browser download repaired; no system installation needed'
-        return
-      fi
-      agent_browser_missing_libraries "$logs/launch-repair.log" ||
-        agent_die "Browser launch failed without missing system libraries; see $logs/launch-repair.log"
+  if [[ ! -x "$AGENT_BROWSER_EXECUTABLE_PATH" ]] || ! agent_browser_missing_libraries "$launch_log"; then
+    agent_log 'Ensuring full Chromium and the default headless shell are installed'
+    # Other workspace packages can use different revisions in the same cache.
+    playwright install --no-remove chromium
+    launch_log="$logs/launch-install.log"
+    if agent_browser_probe "$launch_log"; then
+      agent_log "Browser ready after $((SECONDS - started))s"
+      return
     fi
-    agent_install_browser_dependencies "$logs"
-    agent_browser_probe "$logs/launch-after.log"
   fi
+  if ! agent_browser_missing_libraries "$launch_log"; then
+    # Force repairs an incomplete download whose Playwright install marker already exists.
+    agent_log 'Retrying browser launch after repairing the Chromium download'
+    playwright install --force --no-remove chromium
+    launch_log="$logs/launch-repair.log"
+    if agent_browser_probe "$launch_log"; then
+      agent_log 'Browser download repaired; no system installation needed'
+      return
+    fi
+    agent_browser_missing_libraries "$launch_log" ||
+      agent_die "Browser launch failed without missing system libraries; see $launch_log"
+  fi
+  agent_install_browser_dependencies "$logs"
+  agent_browser_probe "$logs/launch-after.log"
   agent_log "Browser ready after $((SECONDS - started))s (apt=$(cat "$logs/apt-source"))"
 }
 
