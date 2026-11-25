@@ -111,6 +111,43 @@ test('Codex profile activates a parent directory without shadowing an explicit p
   assert.equal(result.status, 0, result.stderr)
 })
 
+test('Codex BASH_ENV activates a fresh non-interactive Bash within its workspace', (t) => {
+  const f = fixture(t)
+  f.env.AGENT_SETUP_TOOLS = 'install'
+  f.env.AGENT_SETUP_CODEX_SCOPE = f.root
+  f.env.AGENT_PLAYWRIGHT_MODULE = path.join(f.root, 'playwright')
+  f.env.AGENT_BROWSER_EXECUTABLE_PATH = path.join(f.root, 'chrome')
+  const prepared = f.shell('agent_persist_environment')
+  assert.equal(prepared.status, 0, prepared.stderr)
+
+  const env = {
+    HOME: f.env.HOME,
+    PATH: '/usr/bin:/bin',
+    BASH_ENV: path.join(f.env.AGENT_SETUP_HOME, 'bash-env.sh'),
+  }
+  const probe = (cwd) =>
+    spawnSync(
+      'bash',
+      [
+        '--noprofile',
+        '--norc',
+        '-c',
+        `printf '%s\\n' "\${AGENT_PLAYWRIGHT_MODULE:-unset}"
+        if [[ -n "\${AGENT_SETUP_ACTIVE_ENV:-}" ]]; then
+          export AGENT_PLAYWRIGHT_MODULE=override
+          bash -c 'printf "%s\\n" "$AGENT_PLAYWRIGHT_MODULE"'
+        fi`,
+      ],
+      { env, cwd, encoding: 'utf8' },
+    )
+  const inside = probe(f.root)
+  assert.equal(inside.status, 0, inside.stderr)
+  assert.equal(inside.stdout, `${f.env.AGENT_PLAYWRIGHT_MODULE}\noverride\n`)
+  const outside = probe(os.tmpdir())
+  assert.equal(outside.status, 0, outside.stderr)
+  assert.equal(outside.stdout, 'unset\n')
+})
+
 test('Codex installs the optional Bun and PostgreSQL pins once and keeps the default Bun', (t) => {
   const f = fixture(t)
   f.env.AGENT_SETUP_TOOLS = 'install'

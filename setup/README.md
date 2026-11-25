@@ -53,6 +53,15 @@ consumer pins this version. A consumer using the updated bootstrap can run
 
 For the integrated checkout mounted directly under `/workspace`, the Codex action
 also activates the generated tools in login shells starting at the mount root.
+For fresh non-interactive Bash processes, the Codex action generates a `BASH_ENV`
+hook that activates the tools under `/workspace`. Pass the hook to the Bash
+process from your automation. Codex Cloud reserves `BASH_ENV` in environment
+settings. If you override `AGENT_SETUP_HOME`, use `bash-env.sh` in that directory.
+
+```bash
+BASH_ENV=/workspace/.astrale-tools/config-runner/bash-env.sh bash -c 'pnpm --version'
+```
+
 A consumer can declare `AGENT_CODEX_BUN_VERSION` for an extra `bun-latest` command,
 and `AGENT_CODEX_POSTGRES_IMAGE` for a PostgreSQL image pinned by digest, in
 `scripts/setup/repo.sh`. Either can be empty. These additions run only for the
