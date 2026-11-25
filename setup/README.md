@@ -7,6 +7,7 @@ Each profile declares the tools, preparation and checks required by its reposito
 ## Structure and ownership
 
 - `bootstrap/setup.sh`: consumer launcher; downloads and verifies the pinned archive.
+- `astrale-setup`: executable entry point in the Config checkout and the release archive.
 - `lib/` and `setup_*.sh`: runtimes, browsers, skills, verification and Claude lifecycle.
 - `profiles/`: repository preparation and checks, receiving an explicit checkout path.
 - `tests/`: archive integrity, cache, runtime isolation and lifecycle checks.
@@ -24,17 +25,39 @@ Copy `bootstrap/setup.sh` to the consumer's `scripts/setup/setup.sh`.
 | Command | Effect |
 | --- | --- |
 | `bash scripts/setup/setup.sh` | Prepare tools, dependencies and artifacts; verify readiness |
+| `astrale-setup REPOSITORY codex` | Prepare and verify a checkout for Codex |
+| `astrale-setup REPOSITORY claude` | Run the Claude lifecycle for a checkout |
 | `bash scripts/setup/setup.sh verify` | Verify readiness without installation or download |
 | `bash scripts/setup/setup.sh artifacts` | Prepare product artifacts without root dependency installation |
 | `bash scripts/setup/setup.sh claude` | Run the Claude SessionStart lifecycle |
 | `AGENT_SETUP_TOOLS=check bash scripts/setup/setup.sh` | Require existing machine tools; prepare project dependencies |
 
-Codex: disable cache, use `AGENT_HARNESSES=codex bash scripts/setup/setup.sh` as
-Setup, leave Maintenance empty. Claude: leave environment Setup empty and invoke
-`claude` from SessionStart. Remote hooks lock preparation and rerun when setup inputs
-change; otherwise they load paths and resume required services. Docker restart reuses its installed
+Preparation defaults to `AGENT_SETUP_CHECKOUT=pinned`. A Workspace initializes missing
+submodules at the commits recorded in its checkout and refuses to move existing
+submodules. Dependencies in the Workspace root, Domains, GUI and MCP install with
+`--frozen-lockfile`; standalone profiles also use their own frozen lockfile.
+Use `AGENT_SETUP_CHECKOUT=live` explicitly to refresh Workspace submodules to their
+remote main branches and permit lockfile updates.
+
+Codex Cloud can use one Setup command when both repositories are attached:
+
+```bash
+/workspace/config/setup/astrale-setup /workspace/workspace codex
+```
+
+Select an exact Config revision for a reproducible environment, or use the same
+executable from the checksum-verified release archive. The existing
+`AGENT_HARNESSES=codex bash scripts/setup/setup.sh` command works once the
+consumer pins this version. A consumer using the updated bootstrap can run
+`bash scripts/setup/setup.sh codex`. Leave Maintenance empty.
+
+With Claude Code, leave environment Setup empty and let the existing SessionStart
+hook call the consumer bootstrap with `claude`. The hook uses the same preparation.
+Remote hooks lock preparation and rerun when setup inputs change; otherwise they
+load paths and resume required services. Docker restart reuses its installed
 engine without installation or downloads. Failed preparation leaves no success marker.
-Local hooks only load prepared paths. Conductor selects `AGENT_SETUP_TOOLS=check`;
+Local hooks only load prepared paths. If shell profiles are read-only, source the
+generated `env.sh` reported by setup. Conductor selects `AGENT_SETUP_TOOLS=check`;
 this permits archive/dependency downloads but never installs machine tools.
 
 Bootstrap requires Bash, curl, tar/gzip and sha256sum or shasum, not Node/npm.
@@ -43,6 +66,7 @@ and runtime download hosts used by the enabled tools. Only the verified archive 
 cached; each invocation extracts a private copy. Versions never follow `latest` or `main`.
 
 GUI readiness executes Electron's version command and probes three browsers.
+Use `AGENT_SETUP_ELECTRON=0` for a headless setup without Electron.
 Installation can repair a diagnosed missing GTK 3 library through signed APT;
 verification/check mode cannot. Root and GitHub runner probes use `--no-sandbox`;
 ordinary local users retain the sandbox. Application display and end-to-end tests
@@ -64,9 +88,10 @@ Profiles implement preflight, artifact preparation and verification. Workspace a
 selects its checkouts and dependency roots, then calls product artifact functions; it never
 runs standalone installers over integrated links. Profile fingerprint/environment extensions
 retain provider inputs and non-secret selections. Git fixtures protect local work during refresh.
-A Workspace submodule whose clone is refused (a cloud session without access to that
-repository) leaves the Workspace partial: tools are prepared, product dependencies and
-artifacts are skipped, and the Claude hook names the missing submodules to attach.
+If a pinned submodule cannot be cloned, setup fails so the environment cannot be
+reported as ready. In live mode a refused clone leaves the Workspace partial: tools
+are prepared, product dependencies and artifacts are skipped, and the Claude hook
+names the missing submodules to attach.
 A declared submodule that Workspace preparation does not cover yet is ignored with a
 warning (also reported in the Claude hook context) rather than failing setup; every
 covered repository must remain declared.

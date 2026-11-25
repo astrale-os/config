@@ -36,14 +36,14 @@ agent_setup_fingerprint() {
     cd "$AGENT_REPO_ROOT"
     cat "$AGENT_SETUP_DIR/package.json"
     if declare -F repo_fingerprint >/dev/null; then repo_fingerprint; fi
-    printf '\0%s\0%s\0' "$AGENT_SETUP_BROWSER" "$AGENT_SETUP_ASTRALE_CLI"
+    printf '\0%s\0%s\0%s\0%s\0' "$AGENT_SETUP_BROWSER" "$AGENT_SETUP_ASTRALE_CLI" "${AGENT_SETUP_ELECTRON:-1}" "${AGENT_SETUP_CHECKOUT:-pinned}"
     git ls-files --cached --others --exclude-standard -z -- \
       'scripts/setup/**' 'package.json' '**/package.json' \
       'pnpm-lock.yaml' '**/pnpm-lock.yaml' 'pnpm-workspace.yaml' '**/pnpm-workspace.yaml' \
       '.npmrc' '**/.npmrc' '.pnpmfile.cjs' '**/.pnpmfile.cjs' \
       '.nvmrc' '.node-version' '.bun-version' '**/.bun-version' \
       'bun.lock' '**/bun.lock' 'bun.lockb' '**/bun.lockb' \
-      'patches/**' '**/patches/**' '.claude/settings.json' |
+      'patches/**' '**/patches/**' '.gitmodules' '.claude/settings.json' |
       while IFS= read -r -d '' file; do
         printf '%s\0' "$file"
         if [[ -f "$file" ]]; then cat "$file"; else printf 'missing'; fi
@@ -58,7 +58,13 @@ agent_load_config() {
   [[ -f "$configuration" ]] || agent_die "Missing repository configuration: $configuration"
   # shellcheck source=/dev/null
   source "$configuration"
-  for name in AGENT_SETUP_BROWSER AGENT_SETUP_ASTRALE_CLI; do
+  export AGENT_SETUP_CHECKOUT="${AGENT_SETUP_CHECKOUT:-pinned}"
+  case "$AGENT_SETUP_CHECKOUT" in
+    pinned|live) ;;
+    *) agent_die "AGENT_SETUP_CHECKOUT must be pinned or live (got: $AGENT_SETUP_CHECKOUT)" ;;
+  esac
+  export AGENT_SETUP_ELECTRON="${AGENT_SETUP_ELECTRON:-1}"
+  for name in AGENT_SETUP_BROWSER AGENT_SETUP_ASTRALE_CLI AGENT_SETUP_ELECTRON; do
     case "${!name:-}" in
       0|1) export "${name?}" ;;
       *) agent_die "$name must be 0 or 1 (got: ${!name:-unset})" ;;
@@ -313,6 +319,7 @@ agent_playwright_module() {
 }
 
 agent_select_browser() {
+  export AGENT_BROWSER_SOCKET_DIR="${AGENT_BROWSER_SOCKET_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/astrale-browser-sockets}"
   export AGENT_PLAYWRIGHT_MODULE
   AGENT_PLAYWRIGHT_MODULE="$(agent_playwright_module)"
   export AGENT_BROWSER_EXECUTABLE_PATH
@@ -338,11 +345,22 @@ agent_skill_directory() {
   esac
 }
 
+agent_check_skill() {
+  local harness="$1" name="$2" project_skills
+  case "$harness" in
+    codex) project_skills="$AGENT_REPO_ROOT/.agents/skills" ;;
+    claude) project_skills="$AGENT_REPO_ROOT/.claude/skills" ;;
+    *) agent_die "Unsupported skills target: $harness" ;;
+  esac
+  node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$project_skills/$name" "$name" ||
+    node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$(agent_skill_directory "$harness")/$name" "$name"
+}
+
 agent_ensure_skill() {
   [[ "$AGENT_SETUP_TOOLS" != check ]] || return 0
   local agent="$1" source="$2" name="$3" destination skills_target
   destination="$(agent_skill_directory "$agent")/$name"
-  if node "$AGENT_SETUP_DIR/lib/skill-check.cjs" "$destination" "$name"; then
+  if agent_check_skill "$agent" "$name"; then
     agent_log "Reusing $name skill for $agent"
     return
   fi
@@ -371,7 +389,7 @@ agent_persist_environment() {
     printf 'export AGENT_SETUP_HOME=%q\n' "$AGENT_SETUP_HOME"
     # shellcheck disable=SC2016 # Expand PATH in the future shell, never capture the setup shell.
     printf 'export PATH=%q:%q:"$PATH"\n' "$AGENT_BIN" "$AGENT_TOOLS/bin"
-    if [[ -n "${AGENT_BROWSER_EXECUTABLE_PATH:-}" ]]; then
+    if [[ -n "${AGENT_PLAYWRIGHT_MODULE:-}" && -n "${AGENT_BROWSER_EXECUTABLE_PATH:-}" ]]; then
       if [[ -n "${PLAYWRIGHT_BROWSERS_PATH+x}" ]]; then
         printf 'export PLAYWRIGHT_BROWSERS_PATH=%q\n' "$PLAYWRIGHT_BROWSERS_PATH"
       else
@@ -379,14 +397,25 @@ agent_persist_environment() {
         printf 'unset PLAYWRIGHT_BROWSERS_PATH\n'
       fi
       printf 'export AGENT_BROWSER_EXECUTABLE_PATH=%q\n' "$AGENT_BROWSER_EXECUTABLE_PATH"
-      printf 'export CHROME_DEVTOOLS_EXECUTABLE_PATH=%q\n' "$CHROME_DEVTOOLS_EXECUTABLE_PATH"
+      if [[ -n "${AGENT_BROWSER_SOCKET_DIR:-}" ]]; then
+        printf 'export AGENT_BROWSER_SOCKET_DIR=%q\n' "$AGENT_BROWSER_SOCKET_DIR"
+      fi
+      printf 'export CHROME_DEVTOOLS_EXECUTABLE_PATH=%q\n' "${CHROME_DEVTOOLS_EXECUTABLE_PATH:-$AGENT_BROWSER_EXECUTABLE_PATH}"
       printf 'export AGENT_PLAYWRIGHT_MODULE=%q\n' "$AGENT_PLAYWRIGHT_MODULE"
     fi
   } > "$temporary"
   mv "$temporary" "$AGENT_ENV_FILE"
   line="$(agent_environment_reference)"
-  for file in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.zprofile" "$HOME/.zshrc"; do
+  for file in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.bashrc" "$HOME/.zprofile" "$HOME/.zshrc"; do
+    # Keep the existing Bash login chain; a new .bash_profile would shadow .profile.
+    if [[ "$file" == "$HOME/.bash_profile" || "$file" == "$HOME/.bash_login" ]]; then
+      [[ -f "$file" ]] || continue
+    fi
     if ! grep -Fqx "$line" "$file" 2>/dev/null; then
+      # Restricted shells can still load the generated activation file explicitly.
+      if [[ -e "$file" && ! -w "$file" ]] || [[ ! -e "$file" && ! -w "$HOME" ]]; then
+        continue
+      fi
       if [[ "$file" == "$HOME/.bashrc" ]]; then
         # Stock Linux bashrc returns early in non-interactive shells.
         temporary="$(mktemp)"
@@ -406,6 +435,13 @@ agent_persist_environment() {
   agent_log "Shell environment: $AGENT_ENV_FILE"
 }
 
+agent_lockfile_option() {
+  case "${AGENT_SETUP_CHECKOUT:-pinned}" in
+    pinned) printf '%s\n' --frozen-lockfile ;;
+    live) printf '%s\n' --no-frozen-lockfile ;;
+  esac
+}
+
 agent_install_repo() {
   cd "$AGENT_REPO_ROOT"
   local before_head before_branch before_lock=missing after_lock=missing result=0
@@ -414,11 +450,12 @@ agent_install_repo() {
   if [[ -f pnpm-lock.yaml ]]; then before_lock="$(git hash-object pnpm-lock.yaml)"; fi
   agent_ensure_pnpm
   # One install at this standalone workspace root. pnpm owns allowed native builds and prepare hooks.
-  STANDALONE=true pnpm install --no-frozen-lockfile --prefer-offline || result=$?
+  STANDALONE=true pnpm install "$(agent_lockfile_option)" --prefer-offline || result=$?
   [[ "$(git rev-parse HEAD)" == "$before_head" ]] || agent_die "HEAD changed during dependency installation"
   [[ "$(git symbolic-ref -q HEAD || true)" == "$before_branch" ]] || agent_die "Branch changed during dependency installation"
   if [[ -f pnpm-lock.yaml ]]; then after_lock="$(git hash-object pnpm-lock.yaml)"; fi
   if [[ "$before_lock" != "$after_lock" ]]; then
+    [[ "$AGENT_SETUP_CHECKOUT" == live ]] || agent_die "pnpm-lock.yaml changed during pinned setup"
     agent_log 'pnpm-lock.yaml changed during setup; review it before committing (setup does not commit)'
   fi
   [[ "$result" == 0 ]] || agent_die "Dependency installation failed in $AGENT_REPO_ROOT (exit $result)"

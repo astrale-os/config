@@ -7,6 +7,11 @@ repo_preflight() {
 }
 repo_prepare() { :; }
 repo_verify() {
+  if [[ "$AGENT_SETUP_PROFILE" == workspace ]]; then
+    # The integrated checkout installs only Config's Ox package.
+    node --input-type=module -e 'await import("./packages/ox/fmt.js"); await import("./packages/ox/lint.js")'
+    return
+  fi
   pnpm exec tsc --version
   # Common verification also imports both local ox configuration exports.
 }

@@ -4,6 +4,15 @@ repo_preflight() {
   [[ "$AGENT_SETUP_ASTRALE_CLI" == 0 ]] || agent_die 'GUI does not install the Astrale CLI'
 }
 repo_prepare() {
+  if [[ "$AGENT_SETUP_BROWSER" == 1 && "$AGENT_SETUP_TOOLS" != check ]]; then
+    agent_select_browser
+    pnpm --dir desktop exec playwright install chromium
+  fi
+  [[ "${AGENT_SETUP_ELECTRON:-1}" == 1 ]] || return 0
+  if [[ "$AGENT_SETUP_TOOLS" == check ]]; then
+    node "$AGENT_SETUP_DIR/lib/electron.cjs"
+    return
+  fi
   local log
   log="$(mktemp)"
   if node "$AGENT_SETUP_DIR/lib/electron.cjs" --prepare > "$log" 2>&1; then
@@ -24,7 +33,9 @@ repo_prepare() {
 }
 repo_verify() {
   [[ -d desktop/node_modules ]] || agent_die 'Missing Desktop dependencies'
-  node "$AGENT_SETUP_DIR/lib/electron.cjs"
+  if [[ "${AGENT_SETUP_ELECTRON:-1}" == 1 ]]; then
+    node "$AGENT_SETUP_DIR/lib/electron.cjs"
+  fi
   pnpm exec tsgo --version
   pnpm exec vitest --version
   pnpm exec vite --version

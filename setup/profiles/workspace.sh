@@ -5,7 +5,10 @@ repo_preflight() {
   [[ -f "$AGENT_REPO_ROOT/.gitmodules" && -f "$AGENT_REPO_ROOT/.astrale-workspace" ]] || agent_die 'Missing Workspace manifests'
 }
 repo_checkout() {
-  workspace_update_main
+  case "$AGENT_SETUP_CHECKOUT" in
+    pinned) workspace_init_pinned ;;
+    live) workspace_update_main ;;
+  esac
   workspace_check_manifests
   local repo version
   version="$(tr -d '[:space:]' < "$AGENT_REPO_ROOT/.bun-version")"
@@ -50,7 +53,7 @@ repo_dependencies() {
   # Never replace integrated links with standalone product installs.
   unset STANDALONE
   for repo in . domains gui mcp; do
-    workspace_pnpm "$root/$repo" install --no-frozen-lockfile --prefer-offline
+    workspace_pnpm "$root/$repo" install "$(agent_lockfile_option)" --prefer-offline
   done
 }
 workspace_profile() (
@@ -74,6 +77,7 @@ repo_prepare() {
   if [[ "$AGENT_SETUP_TOOLS" != check ]]; then agent_link "$AGENT_REPO_ROOT/scripts/astrale-dev" astrale-dev; fi
 }
 repo_verify() {
+  if [[ "$AGENT_SETUP_CHECKOUT" == pinned ]]; then workspace_verify_pins; fi
   workspace_check_manifests
   if workspace_partial; then return 0; fi
   local repo
@@ -96,10 +100,12 @@ repo_verify() {
 repo_fingerprint() {
   local root="$AGENT_REPO_ROOT" repo
   # Root Git does not enumerate files within submodules. Include each child's inputs,
-  # but not HEAD or source edits, so normal development does not refresh branches.
+  # and, in pinned mode, the checkout coordinates it must verify.
   for repo in $(workspace_paths); do
     printf '%s\0' "$repo"
+    if [[ "$AGENT_SETUP_CHECKOUT" == pinned ]]; then workspace_recorded_pin "$repo"; fi
     if [[ -e "$root/$repo/.git" ]]; then
+      if [[ "$AGENT_SETUP_CHECKOUT" == pinned ]]; then git -C "$root/$repo" rev-parse HEAD; fi
       ( export AGENT_REPO_ROOT="$root/$repo"; unset -f repo_fingerprint; agent_setup_fingerprint )
     fi
   done
