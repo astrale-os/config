@@ -2,11 +2,16 @@
 set -euo pipefail
 export AGENT_REPO_ROOT="${1:?Usage: run.sh REPOSITORY [prepare|verify|artifacts|codex|claude]}"
 action="${2:-prepare}"
-if [[ "$action" == codex ]]; then export AGENT_HARNESSES=codex; fi
 PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+if [[ "$action" == codex ]]; then
+  export AGENT_HARNESSES=codex
+  source "$PACKAGE_DIR/lib/codex.sh"
+  agent_codex_defaults
+fi
 source "$PACKAGE_DIR/lib/common.sh"
 export WRANGLER_LOG_PATH="${WRANGLER_LOG_PATH:-$AGENT_SETUP_HOME/logs/wrangler}"
 agent_load_config
+if [[ "$action" == codex ]]; then agent_validate_codex_extras; fi
 agent_resolve_harnesses
 case "${AGENT_SETUP_PROFILE:-}" in config|sdk|gui|cli|admin|domains|shell|datastore|ui|prototype|kernel|mcp|workspace) ;; *) agent_die 'Unsupported setup profile';; esac
 repo_checkout() { :; }
@@ -27,6 +32,7 @@ agent_prepare() {
   # Child preparation publishes activation links; this shell already has them on PATH.
   repo_dependencies
   repo_prepare
+  if [[ "$action" == codex ]]; then agent_prepare_codex_extras; fi
   if [[ "$AGENT_SETUP_BROWSER" == 1 ]]; then agent_select_browser; fi
   agent_persist_environment
   agent_verify

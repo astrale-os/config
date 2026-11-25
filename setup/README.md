@@ -51,6 +51,13 @@ executable from the checksum-verified release archive. The existing
 consumer pins this version. A consumer using the updated bootstrap can run
 `bash scripts/setup/setup.sh codex`. Leave Maintenance empty.
 
+For the integrated checkout mounted directly under `/workspace`, the Codex action
+also activates the generated tools in login shells starting at the mount root.
+A consumer can declare `AGENT_CODEX_BUN_VERSION` for an extra `bun-latest` command,
+and `AGENT_CODEX_POSTGRES_IMAGE` for a PostgreSQL image pinned by digest, in
+`scripts/setup/repo.sh`. Either can be empty. These additions run only for the
+`codex` action and reuse tools or images already available.
+
 With Claude Code, leave environment Setup empty and let the existing SessionStart
 hook call the consumer bootstrap with `claude`. The hook uses the same preparation.
 Remote hooks lock preparation and rerun when setup inputs change; otherwise they
